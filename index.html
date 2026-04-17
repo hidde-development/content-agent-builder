@@ -1080,10 +1080,10 @@
     </div>
 
     <div class="field">
-      <label>Contentstrategie principes</label>
-      <div class="hint">Hoe benadert de agent elk onderwerp? (bijv. "lead altijd met de ondernemer, niet het product")</div>
+      <label>Redactionele invalshoek</label>
+      <div class="hint">De vaste lens waardoor de agent elk onderwerp bekijkt — een principe dat in elke tekst terugkomt. Bijv. "schrijf vanuit het resultaat voor de klant, niet vanuit het proces" of "toon altijd het menselijke verhaal achter de dienst". Laat leeg als je geen vaste invalshoek wil opleggen.</div>
       <div class="chip-input" id="chips-strategie" onclick="focusChipInput(this)">
-        <input type="text" placeholder="Typ en druk Enter…" onkeydown="handleChipKey(event,'strategie')" />
+        <input type="text" placeholder="Typ principe en druk Enter…" onkeydown="handleChipKey(event,'strategie')" />
       </div>
     </div>
   </div>
@@ -1095,7 +1095,7 @@
     <div class="field-row">
       <div class="field">
         <label>Sitemap bestandsnaam</label>
-        <div class="hint">Naam van het sitemap-bestand — upload het bestand ook hierboven</div>
+        <div class="hint">Naam van het sitemap-bestand dat je hierboven uploadt. Heb je hem nog niet? Probeer <strong>uw-domein.nl/sitemap.xml</strong> in je browser — de meeste CMS-en genereren hem automatisch. Of zoek hem op in Google Search Console onder Sitemaps.</div>
         <input type="text" id="SITEMAP_BESTANDSNAAM" placeholder="sitemap.xml" />
       </div>
       <div class="field">
@@ -1106,7 +1106,7 @@
 
     <div class="field">
       <label>Bekende pagina-URL's</label>
-      <div class="hint">Plak hier de URL's die de agent mag linken — één URL per regel. De agent gebruikt deze lijst als ankerpunten voor interne linking.</div>
+      <div class="hint">Plak hier de pagina's die de agent mag gebruiken voor interne links — één URL per regel. Voeg de <strong>10–20 belangrijkste pagina's</strong> toe: denk aan dienst- en productpagina's, de homepage en eventuele landingspagina's. Blogtitels of nieuwsberichten hoef je niet op te nemen. Hoe relevanter de lijst, hoe beter de linksuggesties van de agent.</div>
       <textarea id="SITEMAP_URLS" placeholder="https://www.voorbeeld.nl/diensten/hypotheekadvies&#10;https://www.voorbeeld.nl/over-ons&#10;https://www.voorbeeld.nl/blog" style="min-height:100px;font-size:13px;font-family:monospace"></textarea>
     </div>
   </div>
@@ -1132,7 +1132,7 @@
 
     <div class="field">
       <label>Vertrouwde externe bronnen</label>
-      <div class="hint">Websites of organisaties die de agent mag citeren (bijv. CBS, NHG, rijksoverheid.nl)</div>
+      <div class="hint">Websites die de agent mag raadplegen en citeren voor vaktechnische of feitelijke informatie — bijv. CBS, NHG, rijksoverheid.nl, of branchespecifieke kennisplatforms. <strong>Project-specifieke informatie</strong> (over de organisatie, producten, positionering) haalt de agent altijd uit de geüploade documenten. Laat dit veld leeg als de agent uitsluitend op de aangeleverde documenten moet vertrouwen.</div>
       <div class="chip-input" id="chips-externe-bronnen" onclick="focusChipInput(this)">
         <input type="text" placeholder="Typ en druk Enter…" onkeydown="handleChipKey(event,'externe-bronnen')" />
       </div>
@@ -1202,7 +1202,7 @@
   <!-- Gedragsregels -->
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>Gedragsregels</span></div>
-    <div class="hint" style="margin-bottom:20px">Wat mag de agent absoluut niet doen, schrijven of beweren? Guardrails zorgen voor consistente en veilige output. Geef elke regel een omschrijving én een reden of context.</div>
+    <div class="hint" style="margin-bottom:20px">Wat mag de agent absoluut niet doen, schrijven of beweren? Denk aan: bepaalde claims vermijden, geen vergelijkingen maken met concurrenten, of geen prijsgaranties noemen. Geef elke regel een reden — dat helpt de agent beter begrijpen wanneer de grens van toepassing is. <strong>Laat je dit leeg?</strong> Dan geldt de standaardregel: de agent verzint geen feiten en blijft binnen de aangeleverde kennisbronnen.</div>
     <div class="paired-list" id="paired-guardrails"></div>
     <button class="btn-add" style="margin-top:8px" onclick="addPairedItem('guardrails')">+ Gedragsregel toevoegen</button>
   </div>
