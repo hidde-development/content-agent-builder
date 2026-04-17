@@ -2511,7 +2511,7 @@ function generateKnowledgeMd() {
     ? producten.map(p => `**${p.naam}**${p.url ? ` — [${p.url}](${p.url})` : ''}\n${p.desc || '_geen omschrijving_'}`).join('\n\n')
     : '_Niet opgegeven_';
 
-  const urlTypeLabel = urlType === 'nieuw' ? 'toekomstige URL's (nieuwe website / migratie)' : 'huidige live URL's';
+  const urlTypeLabel = urlType === 'nieuw' ? 'toekomstige URL\u2019s (nieuwe website / migratie)' : 'huidige live URL\u2019s';
 
   return `# Kennisbank — ${client}
 
