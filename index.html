@@ -847,9 +847,12 @@
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>Automatisch invullen</span></div>
 
-    <p style="font-size:14px;color:var(--dark-grey);margin-bottom:20px;line-height:1.6">
+    <p style="font-size:14px;color:var(--dark-grey);margin-bottom:16px;line-height:1.6">
       Upload je stijldocumenten — merkdocument, schrijfwijzer, tone of voice — en wij vullen de velden hieronder automatisch in op basis van de inhoud.
     </p>
+    <div style="font-size:13px;background:var(--off-white);border-left:3px solid var(--purple);padding:10px 14px;border-radius:4px;margin-bottom:20px;color:var(--dark-grey);line-height:1.6">
+      <strong style="color:var(--near-black)">Let op:</strong> deze bestanden worden gebruikt voor analyse. Upload ze daarna <strong>ook als kennisbijlage</strong> in je Custom GPT of Copilot — de agent heeft ze nodig om accuraat te schrijven.
+    </div>
 
     <div class="upload-zone" id="upload-zone">
       <input type="file" id="file-input" multiple accept=".pdf,.txt,.md,.docx,.xml" onchange="handleFiles(this.files)" />
@@ -870,7 +873,7 @@
     <!-- Custom template upload -->
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--off-white)">
       <div style="font-size:13px;font-weight:600;color:var(--near-black);margin-bottom:4px">Eigen contenttemplate (optioneel)</div>
-      <div style="font-size:12px;color:var(--mid-grey);margin-bottom:10px">Upload een eigen paginasjabloon — wordt als extra bijlage meegeleverd in het ZIP-pakket.</div>
+      <div style="font-size:12px;color:var(--mid-grey);margin-bottom:10px">Upload een eigen paginasjabloon — wordt als extra bijlage meegeleverd in het ZIP-pakket en in de agent ingesteld als leidende template.</div>
       <div class="upload-zone" id="template-upload-zone" style="padding:16px 20px;text-align:left;display:flex;align-items:center;gap:12px">
         <input type="file" id="template-file-input" accept=".pdf,.txt,.md,.docx" onchange="handleTemplateFile(this.files)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" />
         <div class="upload-icon" style="margin:0;flex-shrink:0">↑</div>
@@ -1991,18 +1994,25 @@ Upload de onderstaande bestanden als **Knowledge**-bijlagen. Houd deze volgorde 
 
 ---
 
-## Stap 3 — Voeg extra documenten toe (aanbevolen)
+## Stap 3 — Voeg de brondocumenten toe${uploadedFiles.length ? ` (${uploadedFiles.length} bestanden al klaar)` : ''}
 
-Je hebt nog **${customTemplateFile ? 5 : 6} attachment-slots** beschikbaar. Gebruik die voor de originele brondocumenten zodat de agent altijd de meest actuele informatie kan raadplegen:
+De documenten die je hebt geüpload in de Agent Builder zijn gebruikt voor analyse. Upload ze **nu ook als kennisbijlage** in je Custom GPT — de agent heeft de originelen nodig om accuraat te kunnen schrijven.${uploadedFiles.length ? `
 
-- [ ] Merkdocument of brand guidelines (volledig document)
+**Geüploade bestanden — upload deze als bijlage:**
+
+${uploadedFiles.map(f => `- [ ] \`${f.name}\``).join('\n')}` : `
+
+- [ ] Merkdocument of brand guidelines
 - [ ] Schrijfwijzer of redactiestijlgids
-- [ ] Tone of voice document
-- [ ] Sitemap (${orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml')})
-- [ ] Aanvullende kennisbankdocumenten
-- [ ] Productspecificaties, whitepapers of onderzoeksrapporten${customTemplateFile ? `\n\n> **Let op:** je eigen template \`${customTemplateFile.name}\` is al als \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` meegeleverd in dit pakket. Upload dit bestand ook als bijlage in je Custom GPT en vermeld in de instructions dat de agent dit als actief template moet gebruiken in plaats van de standaard sjablonen in \`templates.md\`.` : ''}
+- [ ] Tone of voice document`}
 
-> Hoe meer relevante documenten je toevoegt, hoe nauwkeuriger en consistenter de agent schrijft.
+**Eventuele aanvullende bronnen:**
+
+- [ ] Sitemap (\`${orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml')}\`)
+- [ ] Productspecificaties, whitepapers of onderzoeksrapporten
+- [ ] Aanvullende kennisbankdocumenten${customTemplateFile ? `\n- [ ] \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` (al meegeleverd in dit pakket — ook uploaden als bijlage)` : ''}
+
+> Hoe meer relevante documenten je toevoegt, hoe nauwkeuriger en consistenter de agent schrijft. Je hebt nog **${customTemplateFile ? 5 : 6} attachment-slots** beschikbaar.
 
 ---
 
