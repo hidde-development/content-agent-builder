@@ -1415,14 +1415,30 @@ function handleTemplateFile(fileList) {
     alert(`"${file.name}" is te groot (max. 3 MB)`);
     return;
   }
-  const reader = new FileReader();
   const isPdf = file.type === 'application/pdf';
-  reader.onload = e => {
-    customTemplateFile = { name: file.name, size: file.size, data: e.target.result, isPdf };
-    renderTemplateFile();
-  };
-  if (isPdf) reader.readAsDataURL(file);
-  else reader.readAsText(file);
+  const isDocx = file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc');
+
+  if (isDocx) {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const result = await mammoth.extractRawText({ arrayBuffer: e.target.result });
+        customTemplateFile = { name: file.name, size: file.size, data: result.value, isPdf: false };
+        renderTemplateFile();
+      } catch (err) {
+        alert(`"${file.name}" kon niet worden gelezen: ${err.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      customTemplateFile = { name: file.name, size: file.size, data: e.target.result, isPdf };
+      renderTemplateFile();
+    };
+    if (isPdf) reader.readAsDataURL(file);
+    else reader.readAsText(file);
+  }
 }
 
 function renderTemplateFile() {
@@ -2328,7 +2344,7 @@ Dit document beschrijft hoe ${client} communiceert. Raadpleeg het volledig voor 
 
 ## Aanspreekvorm
 
-Gebruik altijd **${orFallback(val('AANSPREEKVORM'), '[niet ingevuld]')}**. Wissel nooit van aanspreekvorm, ook niet tussen secties of paginatypen.
+Gebruik altijd **${orFallback(btnGroupValues['AANSPREEKVORM'], '[niet ingevuld]')}**. Wissel nooit van aanspreekvorm, ook niet tussen secties of paginatypen.
 
 ---
 
@@ -2774,8 +2790,112 @@ ${externeBronnenSection}
 `;
 }
 
+// ── Twistpunten-check ─────────────────────────────────────────────────────
+function checkTwistpunten() {
+  const issues = [];
+
+  // Aanspreekvorm niet geselecteerd
+  if (!btnGroupValues['AANSPREEKVORM']) {
+    issues.push({ ernst: 'fout', tekst: 'Aanspreekvorm niet geselecteerd — agent weet niet of hij "je" of "u" moet gebruiken.' });
+  }
+
+  // Verboden woorden die opduiken in andere velden
+  const verboden = getChips('verboden').map(w => w.toLowerCase());
+  const checkVelden = [
+    { id: 'TOON_OMSCHRIJVING', label: 'Toon omschrijving' },
+    { id: 'DOELGROEP_VOCABULAIRE', label: 'Doelgroep vocabulaire' },
+    { id: 'DOELGROEP_WANTROUWEN', label: 'Doelgroep wantrouwen' },
+    { id: 'TOON_VERMIJDEN', label: 'Te vermijden toon' },
+  ];
+  verboden.forEach(woord => {
+    checkVelden.forEach(veld => {
+      const inhoud = (document.getElementById(veld.id)?.value || '').toLowerCase();
+      if (inhoud.includes(woord)) {
+        issues.push({ ernst: 'waarschuwing', tekst: `Verboden woord "${woord}" staat ook in "${veld.label}". Agent kan dit als tegenstrijdig interpreteren.` });
+      }
+    });
+    // Check ook in paired fields (doelgroep rol/sector)
+    ['DOELGROEP_ROL', 'DOELGROEP_SECTOR'].forEach(id => {
+      const inhoud = (document.getElementById(id)?.value || '').toLowerCase();
+      if (inhoud.includes(woord)) {
+        issues.push({ ernst: 'waarschuwing', tekst: `Verboden woord "${woord}" staat in "${id.replace('DOELGROEP_', 'Doelgroep ').toLowerCase()}". Overweeg een alternatieve formulering.` });
+      }
+    });
+  });
+
+  // Producten zonder URL
+  const producten = pairedData['producten'] || [];
+  const productenZonderUrl = producten.filter(p => p.naam && !p.url);
+  if (productenZonderUrl.length > 0) {
+    issues.push({ ernst: 'waarschuwing', tekst: `${productenZonderUrl.length} product(en) zonder URL: "${productenZonderUrl.map(p => p.naam).join('", "')}". Interne linking werkt niet zonder URL.` });
+  }
+
+  // Merktermen zonder uitleg
+  const merktermen = pairedData['merktermen'] || [];
+  const termenzonderUitleg = merktermen.filter(m => m.naam && !m.desc);
+  if (termenzonderUitleg.length > 0) {
+    issues.push({ ernst: 'info', tekst: `${termenzonderUitleg.length} merkterm(en) zonder gebruiksinstructie. De agent weet dan niet wanneer of hoe ze in te zetten.` });
+  }
+
+  // Client naam leeg
+  if (!val('CLIENT_NAME')) {
+    issues.push({ ernst: 'fout', tekst: 'Organisatienaam niet ingevuld — agent heeft geen naam om te gebruiken in documenten.' });
+  }
+
+  return issues;
+}
+
+function showTwistpuntenModal(issues, onDoorgaan) {
+  const fouten = issues.filter(i => i.ernst === 'fout');
+  const waarschuwingen = issues.filter(i => i.ernst === 'waarschuwing');
+  const info = issues.filter(i => i.ernst === 'info');
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:16px;padding:32px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)';
+
+  const icoMap = { fout: '🔴', waarschuwing: '🟡', info: '🔵' };
+  const labelMap = { fout: 'Fout', waarschuwing: 'Aandachtspunt', info: 'Tip' };
+
+  const rows = issues.map(i => `
+    <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #eee">
+      <span style="flex-shrink:0">${icoMap[i.ernst]}</span>
+      <div><strong>${labelMap[i.ernst]}:</strong> ${i.tekst}</div>
+    </div>`).join('');
+
+  modal.innerHTML = `
+    <h2 style="margin:0 0 8px;font-size:20px;font-weight:600">Controleer vóór download</h2>
+    <p style="margin:0 0 20px;color:#555;font-size:14px">We hebben ${issues.length} punt${issues.length !== 1 ? 'en' : ''} gevonden. ${fouten.length ? 'Los de fouten op voor een werkende agent.' : 'Je kunt doorgaan, maar deze punten verbeteren de kwaliteit.'}</p>
+    <div style="margin-bottom:24px">${rows}</div>
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <button onclick="this.closest('[data-overlay]').remove()" style="padding:10px 20px;border:1.5px solid #ddd;background:#fff;border-radius:8px;cursor:pointer;font-size:14px">Terug aanpassen</button>
+      ${fouten.length === 0 ? `<button id="btn-toch-downloaden" style="padding:10px 20px;background:#6331F4;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">Toch downloaden</button>` : ''}
+    </div>`;
+
+  overlay.dataset.overlay = '1';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  modal.querySelector('#btn-toch-downloaden')?.addEventListener('click', () => {
+    overlay.remove();
+    onDoorgaan();
+  });
+}
+
 // ── ZIP download ──────────────────────────────────────────────────────────
 async function downloadCustomAgent() {
+  const issues = checkTwistpunten();
+  if (issues.length > 0) {
+    showTwistpuntenModal(issues, () => _doDownloadCustomAgent());
+    return;
+  }
+  _doDownloadCustomAgent();
+}
+
+async function _doDownloadCustomAgent() {
   const btn = document.querySelector('.btn-generate');
   const original = btn.textContent;
   btn.textContent = 'Bezig…';
