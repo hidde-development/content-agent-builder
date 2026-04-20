@@ -1273,6 +1273,7 @@
 
       <div class="field" style="margin-top:20px">
         <label>Naam van de environment variable voor de CMS API-key</label>
+        <div class="hint">Dit is de variabelenaam in je <code>.env.local</code> en Vercel dashboard — niet de sleutel zelf. Wordt automatisch ingevuld op basis van het gekozen platform.</div>
         <input type="text" id="lc-cms-keyname" placeholder="WEBFLOW_API_KEY" oninput="this.dataset.manuallyEdited='1'" />
       </div>
 
@@ -3068,6 +3069,9 @@ function selectRedirectFormat(format) {
 }
 
 function openLangChainModal() {
+  // Reset key name field so auto-fill always triggers on open
+  const keyField = document.getElementById('lc-cms-keyname');
+  if (keyField) { keyField.value = ''; delete keyField.dataset.manuallyEdited; }
   selectLcCms('webflow');
   lcMigrationEnabled = false;
   lcRedirectFormat = 'vercel';
