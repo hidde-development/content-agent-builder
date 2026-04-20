@@ -1343,10 +1343,29 @@ function handleFiles(fileList) {
     }
     if (uploadedFiles.find(f => f.name === file.name)) return;
 
-    const isPdf = file.type === 'application/pdf';
+    const isPdf  = file.type === 'application/pdf';
     const isDocx = file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc');
+    const isXml  = file.name.toLowerCase().endsWith('.xml') || file.type === 'application/xml' || file.type === 'text/xml';
 
-    if (isDocx) {
+    if (isXml) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        const data = parseSitemap(text);
+        if (data) {
+          parsedSitemapData = data;
+          // Auto-fill sitemap bestandsnaam if empty
+          const nameField = document.getElementById('SITEMAP_BESTANDSNAAM');
+          if (nameField && !nameField.value.trim()) nameField.value = file.name;
+          applySitemapToForm(data);
+          showSitemapResult(data, file.name);
+        }
+        // Also store as regular upload for extraction
+        uploadedFiles.push({ name: file.name, size: file.size, mediaType: 'text/plain', data: text });
+        renderUploadedFiles();
+      };
+      reader.readAsText(file);
+    } else if (isDocx) {
       const reader = new FileReader();
       reader.onload = async e => {
         try {
@@ -2760,6 +2779,14 @@ function generateKnowledgeMd() {
 
   const urlTypeLabel = urlType === 'nieuw' ? 'toekomstige URL\u2019s (nieuwe website / migratie)' : 'huidige live URL\u2019s';
 
+  // Sitemap cluster map
+  const clusterSection = parsedSitemapData && parsedSitemapData.clusters.length
+    ? `\n---\n\n## URL-hiërarchie & clusters\n\nGebruik deze structuur voor correcte ouderpage-links en clusterlinks.\n\n` +
+      parsedSitemapData.clusters.map(([prefix, urls]) =>
+        `**${prefix}** (${urls.length} pagina's)\n` + urls.slice(0, 8).map(u => `- ${u}`).join('\n') + (urls.length > 8 ? `\n- … (${urls.length - 8} meer)` : '')
+      ).join('\n\n')
+    : '';
+
   return `# Kennisbank — ${client}
 
 Gebruik **alleen** de onderstaande bronnen en gegevens. Verzin geen feiten. Ontbreekt informatie die je nodig hebt? Meld dit aan de gebruiker en vraag om aanvulling.
@@ -2770,7 +2797,7 @@ Gebruik **alleen** de onderstaande bronnen en gegevens. Verzin geen feiten. Ontb
 
 De onderstaande URL's zijn ${urlTypeLabel}.
 
-${productenSection}
+${productenSection}${clusterSection}
 
 ---
 
@@ -2788,6 +2815,94 @@ ${chipsToMd('kennisbank')}
 Vult de kennisbank aan. Overschrijft wetgeving nooit.
 ${externeBronnenSection}
 `;
+}
+
+// ── Sitemap parser ────────────────────────────────────────────────────────
+let parsedSitemapData = null; // { navUrls, productUrls, clusters, allUrls }
+
+const SERVICE_PATTERNS = ['/dienst', '/service', '/oplossing', '/aanbod', '/product', '/wat-we-doen', '/expertise', '/specialisme', '/praktijk'];
+const BLOG_PATTERNS    = ['/blog', '/artikel', '/nieuws', '/kennisbank', '/kenniscentrum', '/tips', '/whitepaper', '/gids', '/inspiratie'];
+const NAV_EXCLUDE      = ['/tag/', '/categorie/', '/category/', '/author/', '/feed', '/wp-', '?', '#', '.xml', '.pdf'];
+
+function parseSitemap(xmlText) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    if (doc.querySelector('parsererror')) return null;
+
+    const locs = [...doc.querySelectorAll('loc')].map(el => el.textContent.trim()).filter(Boolean);
+    if (!locs.length) return null;
+
+    // Derive base domain
+    const base = (() => {
+      try { const u = new URL(locs[0]); return u.origin; } catch { return ''; }
+    })();
+
+    const getPath = url => { try { return new URL(url).pathname; } catch { return url; } };
+    const depth   = path => path.replace(/\/$/, '').split('/').filter(Boolean).length;
+    const isExcluded = url => NAV_EXCLUDE.some(p => url.includes(p));
+
+    // All usable URLs
+    const allUrls = locs.filter(u => !isExcluded(u));
+
+    // Top-level nav pages: depth <= 1 (homepage, /over-ons, /contact, /diensten)
+    const navUrls = allUrls.filter(u => depth(getPath(u)) <= 1);
+
+    // Service/product pages
+    const productUrls = allUrls.filter(u => SERVICE_PATTERNS.some(p => getPath(u).includes(p)));
+
+    // Blog/article pages
+    const blogUrls = allUrls.filter(u => BLOG_PATTERNS.some(p => getPath(u).includes(p)));
+
+    // Cluster map: group by first path segment
+    const clusterMap = {};
+    allUrls.forEach(u => {
+      const parts = getPath(u).replace(/\/$/, '').split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        const key = '/' + parts[0] + '/';
+        if (!clusterMap[key]) clusterMap[key] = [];
+        clusterMap[key].push(u);
+      }
+    });
+    // Keep clusters with 2+ pages
+    const clusters = Object.entries(clusterMap)
+      .filter(([, urls]) => urls.length >= 2)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 10);
+
+    return { base, navUrls, productUrls, blogUrls, clusters, allUrls, total: allUrls.length };
+  } catch { return null; }
+}
+
+function applySitemapToForm(data) {
+  // Fill SITEMAP_URLS with nav + service pages (max 20)
+  const topUrls = [...new Set([...data.navUrls, ...data.productUrls])].slice(0, 20);
+  const urlField = document.getElementById('SITEMAP_URLS');
+  if (urlField && !urlField.value.trim()) {
+    urlField.value = topUrls.join('\n');
+    urlField.classList.add('ai-filled');
+  }
+
+  // Pre-fill producten if empty
+  const existing = getPaired('producten').filter(p => p.naam);
+  if (!existing.length && data.productUrls.length) {
+    pairedData['producten'] = data.productUrls.slice(0, 12).map(u => {
+      const parts = new URL(u).pathname.replace(/\/$/, '').split('/').filter(Boolean);
+      const slug = parts[parts.length - 1] || '';
+      const naam = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return { naam, desc: '', url: u };
+    });
+    renderPaired('producten');
+  }
+}
+
+function showSitemapResult(data, filename) {
+  const status = document.getElementById('analyse-status');
+  const clusters = data.clusters.length
+    ? ` · ${data.clusters.length} cluster${data.clusters.length !== 1 ? 's' : ''}`
+    : '';
+  status.textContent = `✓ Sitemap gelezen: ${data.total} URL's · ${data.navUrls.length} navigatiepagina's · ${data.productUrls.length} dienst/productpagina's${clusters}`;
+  status.className = 'analyse-status success';
 }
 
 // ── Twistpunten-check ─────────────────────────────────────────────────────
