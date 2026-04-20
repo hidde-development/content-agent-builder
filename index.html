@@ -3124,9 +3124,16 @@ async function confirmLangChainDownload() {
 
 // ── LangChain config collector ────────────────────────────────────────────
 function buildLcConfig() {
+  const sitemapRaw = val('SITEMAP_URLS') || '';
+  const firstUrl = sitemapRaw.split('\n').map(s => s.trim()).filter(Boolean)[0];
+  let baseDomain = 'https://www.voorbeeld.nl';
+  if (firstUrl) {
+    try { baseDomain = new URL(firstUrl).origin; } catch {}
+  }
   return {
     client:       val('CLIENT_NAME')  || '[KLANT]',
     agency:       val('AGENCY_NAME')  || 'Goldfizh',
+    baseDomain,
     taal:         btnGroupValues['TAAL']         || 'nl-NL',
     taalLabel:    ({'nl-NL':'Nederlands','en-GB':'Engels (Brits)','en-US':'Engels (Amerikaans)','de-DE':'Duits'})[btnGroupValues['TAAL']] || 'Nederlands',
     aanspreekvorm:btnGroupValues['AANSPREEKVORM']|| 'je/jij',
@@ -3157,6 +3164,7 @@ async function generateAndDownloadLangChain(cmsConfig, migrationConfig = {}) {
   zip.file('vercel.json',              lcGenVercelJson(mig));
   zip.file('.env.example',             lcGenEnvExample(cmsConfig));
   zip.file('README.md',                lcGenReadme(cfg, cmsConfig, migrationConfig));
+  zip.file('index.html',               lcGenFrontend(cfg, cmsConfig, migrationConfig));
   zip.file('api/agent.js',             lcGenApiAgent());
   zip.file('api/migrate.js',           lcGenApiMigrate());
   zip.file('lib/agent.js',             lcGenLibAgent(mig));
@@ -4657,6 +4665,865 @@ function lcGenApiCmsImport(cms) {
     '  });',
     '}',
   ].join('\n');
+}
+
+// ── Frontend (premium styling) ────────────────────────────────────────────
+function lcGenFrontend(cfg, cms, migConfig = {}) {
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const client = esc(cfg.client || 'Klant');
+  const agency = esc(cfg.agency || 'Goldfizh');
+  const base   = (cfg.baseDomain || 'https://www.voorbeeld.nl').replace(/\/$/, '');
+  const cmsLabel = ({ webflow: 'Webflow', contentful: 'Contentful', prepr: 'Prepr', headless: 'headless CMS', andere: 'het CMS' })[cms?.platform] || 'het CMS';
+  const mig    = !!migConfig.enabled;
+  const hasCms = mig && cms?.platform && cms.platform !== 'andere';
+
+  const navMigTab    = mig ? `<button class="nav-tab" onclick="switchTab('migratie')">Migratie</button>` : '';
+  const migTabPanel  = mig ? lcGenFrontendMigratieTab(base, cmsLabel, hasCms) : '';
+  const apiMigRows   = mig ? lcGenFrontendApiMig(hasCms) : '';
+
+  return `<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${client} Content Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --purple: #6331F4;
+      --purple-deep: #4E23C9;
+      --purple-light: #E2DBFF;
+      --purple-lighter: #EEE9FF;
+      --near-black: #22222D;
+      --dark-grey: #555E63;
+      --mid-grey: #8C99AA;
+      --light-grey: #DCE0E6;
+      --off-white: #F4F4F6;
+      --white: #FFFFFF;
+      --shadow-sm: 0 1px 2px rgba(34, 34, 45, 0.04), 0 1px 3px rgba(34, 34, 45, 0.03);
+      --shadow-md: 0 2px 4px rgba(34, 34, 45, 0.04), 0 4px 12px rgba(34, 34, 45, 0.04);
+      --gradient-purple: linear-gradient(135deg, #6331F4 0%, #4E23C9 100%);
+      --gradient-purple-soft: linear-gradient(135deg, #EEE9FF 0%, #E2DBFF 100%);
+      --gradient-header: linear-gradient(135deg, #22222D 0%, #2B2540 100%);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Epilogue', Calibri, sans-serif;
+      color: var(--near-black);
+      min-height: 100vh;
+      background: var(--off-white);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 49, 244, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 20%, rgba(99, 49, 244, 0.04) 0%, transparent 60%);
+      background-attachment: fixed;
+    }
+    header {
+      background: var(--gradient-header);
+      padding: 24px 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(99, 49, 244, 0.15);
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-mark {
+      width: 36px; height: 36px; background: var(--gradient-purple);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: white; border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(99, 49, 244, 0.35);
+    }
+    .logo-text { color: white; font-size: 16px; font-weight: 600; }
+    .logo-sub { color: var(--mid-grey); font-size: 13px; }
+    .api-key-wrap { display: flex; align-items: center; gap: 10px; }
+    .api-key-wrap label { color: var(--mid-grey); font-size: 13px; }
+    .api-key-wrap input {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px; padding: 7px 12px; color: white; font-size: 13px;
+      font-family: monospace; width: 220px;
+    }
+    .api-key-wrap input::placeholder { color: var(--mid-grey); }
+
+    nav {
+      background: var(--white);
+      border-bottom: 1px solid var(--light-grey);
+      padding: 0 48px; display: flex; gap: 0;
+    }
+    .nav-tab {
+      padding: 16px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+      border-bottom: 3px solid transparent; color: var(--dark-grey);
+      transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none;
+    }
+    .nav-tab:hover { color: var(--near-black); }
+    .nav-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+
+    main { max-width: 900px; margin: 0 auto; padding: 56px 24px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    h1 { font-size: 38px; font-weight: 300; margin-bottom: 14px; letter-spacing: -0.02em; line-height: 1.15; }
+    .page-sub { color: var(--dark-grey); font-size: 16px; margin-bottom: 48px; line-height: 1.65; max-width: 640px; }
+
+    .card {
+      position: relative;
+      background: white; border-radius: 20px; padding: 44px 48px;
+      margin-bottom: 32px; border: 1px solid rgba(220, 224, 230, 0.7);
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.25s ease, transform 0.25s ease;
+      overflow: hidden;
+    }
+    .card::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--gradient-purple); opacity: 0.9;
+    }
+    .card:hover { box-shadow: var(--shadow-md); }
+    .card-header { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 28px; }
+    .card-icon {
+      width: 52px; height: 52px; background: var(--gradient-purple);
+      border-radius: 14px; display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+      box-shadow: 0 6px 18px rgba(99, 49, 244, 0.28), inset 0 1px 0 rgba(255,255,255,0.2);
+      color: white;
+    }
+    .card-title { font-size: 20px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em; }
+    .card-desc { font-size: 14.5px; color: var(--dark-grey); line-height: 1.7; }
+    .card-when {
+      background: linear-gradient(135deg, rgba(238, 233, 255, 0.45) 0%, rgba(226, 219, 255, 0.3) 100%);
+      border-radius: 12px; padding: 16px 20px;
+      font-size: 13.5px; color: var(--dark-grey); margin-bottom: 28px;
+      border: 1px solid rgba(99, 49, 244, 0.12);
+      line-height: 1.6;
+    }
+    .card-when strong { color: var(--purple-deep); font-weight: 600; }
+
+    .form-row { margin-bottom: 24px; }
+    label {
+      display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px;
+      color: var(--near-black); letter-spacing: 0.02em; text-transform: uppercase;
+    }
+    .hint { font-size: 13px; color: var(--mid-grey); margin-bottom: 10px; line-height: 1.5; }
+    input[type=text], input[type=url], textarea, select {
+      width: 100%; padding: 13px 16px; border: 1px solid rgba(220, 224, 230, 0.8);
+      border-radius: 10px; font-size: 14.5px; font-family: inherit;
+      color: var(--near-black); background: rgba(255, 255, 255, 0.9);
+      transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    input[type=text]:hover, input[type=url]:hover, textarea:hover, select:hover {
+      border-color: rgba(99, 49, 244, 0.25);
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none; border-color: var(--purple); background: white;
+      box-shadow: 0 0 0 4px rgba(99, 49, 244, 0.1);
+    }
+    textarea { resize: vertical; min-height: 96px; line-height: 1.65; }
+    .form-row textarea.mono { font-family: monospace; font-size: 13px; }
+
+    .btn-group-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-opt {
+      padding: 10px 18px; border: 1px solid rgba(220, 224, 230, 0.8); border-radius: 10px;
+      font-size: 13px; font-weight: 600; cursor: pointer; background: white;
+      color: var(--dark-grey); transition: all 0.2s ease;
+    }
+    .btn-opt:hover { border-color: var(--purple); color: var(--purple); transform: translateY(-1px); }
+    .btn-opt.sel {
+      background: var(--gradient-purple); border-color: transparent; color: white;
+      box-shadow: 0 4px 12px rgba(99, 49, 244, 0.28);
+    }
+
+    .btn-primary {
+      background: var(--gradient-purple); color: white; border: none; border-radius: 12px;
+      padding: 14px 28px; font-size: 15px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease;
+      width: 100%; margin-top: 12px;
+      box-shadow: 0 2px 8px rgba(99, 49, 244, 0.25);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99, 49, 244, 0.32); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; transform: none; }
+    .btn-secondary {
+      background: white; color: var(--purple); border: 1.5px solid var(--purple);
+      border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+    }
+    .btn-secondary:hover { background: var(--purple-light); }
+
+    .output-box {
+      display: none; margin-top: 20px; border: 1.5px solid var(--light-grey);
+      border-radius: 10px; overflow: hidden;
+    }
+    .output-box.show { display: block; }
+    .output-header {
+      background: var(--off-white); padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--light-grey);
+    }
+    .output-label { font-size: 13px; font-weight: 600; color: var(--dark-grey); }
+    .output-content {
+      padding: 20px; font-size: 14px; line-height: 1.7;
+      white-space: pre-wrap; font-family: monospace; max-height: 500px;
+      overflow-y: auto; color: var(--near-black);
+    }
+    .status-bar {
+      padding: 12px 16px; border-radius: 8px; font-size: 14px;
+      margin-top: 12px; display: none;
+    }
+    .status-bar.show { display: block; }
+    .status-bar.info { background: var(--purple-light); color: var(--purple); }
+    .status-bar.success { background: #E6F7EE; color: #1A7A45; }
+    .status-bar.error { background: #FEE8E8; color: #C0392B; }
+
+    .progress-wrap { margin-top: 16px; display: none; }
+    .progress-wrap.show { display: block; }
+    .progress-bar-bg { background: var(--light-grey); border-radius: 99px; height: 8px; margin: 8px 0; }
+    .progress-bar-fill { background: var(--gradient-purple); border-radius: 99px; height: 8px; transition: width 0.4s; }
+    .progress-label { font-size: 13px; color: var(--dark-grey); }
+
+    .results-list { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .result-item { border: 1px solid var(--light-grey); border-radius: 8px; overflow: hidden; }
+    .result-item-header {
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+      background: var(--off-white); font-size: 13px; cursor: pointer;
+    }
+    .result-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .result-dot.ok { background: #27AE60; }
+    .result-dot.err { background: #E74C3C; }
+    .result-url { font-weight: 600; flex: 1; }
+    .result-body { display: none; padding: 14px; font-size: 13px; font-family: monospace; white-space: pre-wrap; border-top: 1px solid var(--light-grey); max-height: 300px; overflow-y: auto; }
+    .result-body.open { display: block; }
+
+    .api-card {
+      background: white; border-radius: 16px; padding: 28px 32px;
+      margin-bottom: 20px; border: 1px solid var(--light-grey);
+      box-shadow: var(--shadow-sm);
+    }
+    .api-method {
+      display: inline-block; background: var(--gradient-purple); color: white;
+      font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+      margin-right: 8px; vertical-align: middle;
+    }
+    .api-path { font-family: monospace; font-size: 15px; font-weight: 600; vertical-align: middle; }
+    .api-desc { font-size: 14px; color: var(--dark-grey); margin: 10px 0; line-height: 1.6; }
+    .api-fields { margin-top: 12px; }
+    .api-fields table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .api-fields th { text-align: left; padding: 6px 10px; background: var(--off-white); color: var(--dark-grey); font-weight: 600; }
+    .api-fields td { padding: 6px 10px; border-top: 1px solid var(--light-grey); vertical-align: top; }
+    .api-fields code { font-family: monospace; background: var(--off-white); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+    .tag-required { font-size: 10px; background: #FFF3CD; color: #856404; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+    .tag-optional { font-size: 10px; background: var(--off-white); color: var(--mid-grey); padding: 1px 5px; border-radius: 3px; }
+
+    .redirect-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+    .redirect-table th { text-align: left; padding: 8px 12px; background: var(--near-black); color: white; font-weight: 600; }
+    .redirect-table td { padding: 8px 12px; border-top: 1px solid var(--light-grey); font-family: monospace; }
+    .conf-high { color: #27AE60; font-weight: 600; }
+    .conf-mid { color: #F39C12; font-weight: 600; }
+    .conf-low { color: #E74C3C; font-weight: 600; }
+
+    .divider { height: 1px; background: var(--light-grey); margin: 44px 0; }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--mid-grey); margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">→</div>
+    <div>
+      <div class="logo-text">${client} Content Agent</div>
+      <div class="logo-sub">Aangedreven door ${agency}</div>
+    </div>
+  </div>
+  <div class="api-key-wrap">
+    <label for="api-key-input">API key</label>
+    <input type="text" id="api-key-input" placeholder="Laat leeg als niet vereist" />
+  </div>
+</header>
+
+<nav>
+  <button class="nav-tab active" onclick="switchTab('schrijf')">Schrijf pagina</button>
+  ${navMigTab}
+  <button class="nav-tab" onclick="switchTab('api')">API overzicht</button>
+</nav>
+
+<main>
+
+  <div class="tab-panel active" id="tab-schrijf">
+    <h1>Schrijf een pagina</h1>
+    <p class="page-sub">Geef de agent een opdracht en hij schrijft een productieklare webpagina op basis van het merkprofiel, SEO-richtlijnen en de templates van ${client}.</p>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">✍️</div>
+        <div>
+          <div class="card-title">Nieuwe pagina schrijven</div>
+          <div class="card-desc">De agent laadt automatisch alle merkregels, SEO-richtlijnen en templates. Jij geeft alleen de opdracht — hij schrijft de volledige pagina inclusief meta-titel en -beschrijving.</div>
+        </div>
+      </div>
+      <div class="card-when">
+        <strong>Gebruik dit voor:</strong> het schrijven van nieuwe dienst-, product- of artikelpagina's, cases en social proof snippets. De agent raadpleegt altijd eerst de kennisbank.
+      </div>
+
+      <div class="form-row">
+        <label>Paginatype</label>
+        <div class="btn-group-row" id="pagetype-group">
+          <button class="btn-opt sel" data-value="dienstpagina" onclick="selectPagetype(this)">Dienstpagina</button>
+          <button class="btn-opt" data-value="productpagina" onclick="selectPagetype(this)">Productpagina</button>
+          <button class="btn-opt" data-value="artikelpagina" onclick="selectPagetype(this)">Artikelpagina</button>
+          <button class="btn-opt" data-value="case" onclick="selectPagetype(this)">Case</button>
+          <button class="btn-opt" data-value="social proof snippet" onclick="selectPagetype(this)">Social proof</button>
+          <button class="btn-opt" data-value="overig" onclick="selectPagetype(this)">Overig</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>URL van de pagina</label>
+        <div class="hint">De toekomstige URL — ook als de pagina nog niet bestaat.</div>
+        <input type="url" id="w-url" placeholder="${base}/diensten/voorbeeld-dienst" />
+      </div>
+      <div class="form-row">
+        <label>Zoekwoorden</label>
+        <div class="hint">Primair zoekwoord eerst, daarna secundaire, kommagescheiden.</div>
+        <input type="text" id="w-keywords" placeholder="primair zoekwoord, secundair zoekwoord" />
+      </div>
+      <div class="form-row">
+        <label>Opdracht / brief</label>
+        <div class="hint">Wat moet de pagina doen, wat is de context, zijn er specifieke punten die erin moeten?</div>
+        <textarea id="w-brief" rows="4" placeholder="Beschrijf de opdracht, doelgroep en eventuele specifieke punten…"></textarea>
+      </div>
+      <div class="form-row">
+        <label>Bronpagina's ophalen (optioneel)</label>
+        <div class="hint">URL's van bestaande pagina's die als bron dienen — één per regel. De agent haalt ze op en verwerkt ze.</div>
+        <textarea id="w-sources" class="mono" rows="3" placeholder="${base}/&#10;${base}/over-ons"></textarea>
+      </div>
+      <button class="btn-primary" onclick="schrijfPagina(this)">Schrijf pagina</button>
+      <div class="status-bar" id="w-status"></div>
+      <div class="output-box" id="w-output">
+        <div class="output-header">
+          <span class="output-label">Gegenereerde pagina</span>
+          <button class="btn-secondary" onclick="copyOutput('w-content')">Kopieer</button>
+        </div>
+        <div class="output-content" id="w-content"></div>
+      </div>
+    </div>
+  </div>
+
+  ${migTabPanel}
+
+  <div class="tab-panel" id="tab-api">
+    <h1>API overzicht</h1>
+    <p class="page-sub">Alle beschikbare endpoints van de ${client} Content Agent. Gebruik <code>Authorization: Bearer {API_KEY}</code> als authenticatie is ingesteld.</p>
+
+    <div class="api-card">
+      <div><span class="api-method">POST</span><span class="api-path">/api/agent</span></div>
+      <div class="api-desc">Schrijft één productieklare webpagina op basis van merkregels, SEO-richtlijnen en templates. Ondersteunt ook consolidatie van meerdere bronpagina's.</div>
+      <div class="api-fields">
+        <table>
+          <tr><th>Veld</th><th>Type</th><th>Verplicht</th><th>Omschrijving</th></tr>
+          <tr><td><code>url</code></td><td>string</td><td><span class="tag-required">Verplicht</span></td><td>Toekomstige URL van de pagina</td></tr>
+          <tr><td><code>pageType</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>dienstpagina / productpagina / artikelpagina / case / social proof snippet / overig</td></tr>
+          <tr><td><code>keywords</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>Zoekwoorden, kommagescheiden</td></tr>
+          <tr><td><code>brief</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>Schrijfopdracht of context</td></tr>
+          <tr><td><code>sources</code></td><td>string[]</td><td><span class="tag-optional">Optioneel</span></td><td>URL's van bronpagina's — agent haalt ze op en consolideert</td></tr>
+        </table>
+      </div>
+    </div>
+    ${apiMigRows}
+  </div>
+
+</main>
+
+<script>
+  let pagetypeValue = 'dienstpagina';
+  let migratePagetype = 'dienstpagina';
+  let redirectPermanent = true;
+  let importOp = 'create';
+  let bulkRunning = false;
+
+  function authHeaders() {
+    const key = document.getElementById('api-key-input').value.trim();
+    const h = { 'Content-Type': 'application/json' };
+    if (key) h['Authorization'] = 'Bearer ' + key;
+    return h;
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function selectPagetype(btn) {
+    document.querySelectorAll('#pagetype-group .btn-opt').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    pagetypeValue = btn.dataset.value;
+  }
+  function selectMigratePagetype(btn) {
+    document.querySelectorAll('#migrate-pagetype-group .btn-opt').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    migratePagetype = btn.dataset.value;
+  }
+  function selectRedirectType(btn) {
+    document.querySelectorAll('#redirect-type-group .btn-opt').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    redirectPermanent = btn.dataset.value === 'true';
+  }
+  function selectImportOp(btn) {
+    document.querySelectorAll('#import-op-group .btn-opt').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    importOp = btn.dataset.value;
+  }
+
+  function setStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'status-bar show ' + type;
+  }
+  function hideStatus(id) {
+    const el = document.getElementById(id);
+    if (el) el.className = 'status-bar';
+  }
+
+  function copyOutput(id) {
+    navigator.clipboard.writeText(document.getElementById(id).textContent);
+  }
+
+  async function schrijfPagina(btn) {
+    const url = document.getElementById('w-url').value.trim();
+    const keywords = document.getElementById('w-keywords').value.trim();
+    const brief = document.getElementById('w-brief').value.trim();
+    const sourcesRaw = document.getElementById('w-sources').value.trim();
+    const sources = sourcesRaw ? sourcesRaw.split('\\n').map(s => s.trim()).filter(Boolean) : [];
+
+    if (!url) { setStatus('w-status', 'Vul een URL in.', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Bezig…';
+    setStatus('w-status', 'Agent is aan het schrijven — dit duurt 20–60 seconden…', 'info');
+    document.getElementById('w-output').classList.remove('show');
+
+    try {
+      const res = await fetch('/api/agent', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ url, pageType: pagetypeValue, keywords, brief, sources }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Onbekende fout');
+      document.getElementById('w-content').textContent = data.content;
+      document.getElementById('w-output').classList.add('show');
+      setStatus('w-status', '✓ Pagina gegenereerd. Controleer de inhoud vóór publicatie.', 'success');
+    } catch (err) {
+      setStatus('w-status', 'Fout: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Schrijf pagina';
+    }
+  }
+
+  async function startBulk(btn) {
+    if (bulkRunning) { bulkRunning = false; btn.textContent = 'Start bulk generatie'; return; }
+    const urlsRaw = document.getElementById('m-urls').value.trim();
+    const urls = urlsRaw ? urlsRaw.split('\\n').map(u => u.trim()).filter(Boolean) : [];
+    if (!urls.length) { setStatus('m-status', 'Vul minimaal één URL in.', 'error'); return; }
+
+    bulkRunning = true;
+    btn.textContent = 'Stop';
+    document.getElementById('m-results').innerHTML = '';
+    document.getElementById('m-progress').classList.add('show');
+    hideStatus('m-status');
+
+    let completed = [];
+    const keywords = document.getElementById('m-keywords').value.trim();
+
+    while (bulkRunning) {
+      try {
+        const res = await fetch('/api/migrate', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ urls, completed, batchSize: 3, pageType: migratePagetype, keywords }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'API fout');
+
+        (data.results || []).forEach(r => addResultItem(r));
+
+        completed = data.completed || [];
+        const pct = urls.length ? Math.round(completed.length / urls.length * 100) : 0;
+        document.getElementById('m-progress-fill').style.width = pct + '%';
+        document.getElementById('m-progress-label').textContent = completed.length + ' van ' + urls.length + ' pagina\\'s verwerkt';
+
+        if (data.done) {
+          bulkRunning = false;
+          setStatus('m-status', '✓ Alle pagina\\'s verwerkt.', 'success');
+          break;
+        }
+      } catch (err) {
+        bulkRunning = false;
+        setStatus('m-status', 'Fout: ' + err.message, 'error');
+        break;
+      }
+    }
+
+    btn.textContent = 'Start bulk generatie';
+    bulkRunning = false;
+  }
+
+  function addResultItem(r) {
+    const list = document.getElementById('m-results');
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    item.innerHTML = \`
+      <div class="result-item-header" onclick="toggleResult(this)">
+        <div class="result-dot \${r.success ? 'ok' : 'err'}"></div>
+        <div class="result-url">\${r.url}</div>
+        <span style="color:var(--mid-grey);font-size:12px">\${r.success ? '✓ Gegenereerd' : '✗ Mislukt'} — klik om te bekijken</span>
+      </div>
+      <div class="result-body">\${r.success ? (r.content || '') : (r.error || 'Onbekende fout')}</div>\`;
+    list.appendChild(item);
+  }
+  function toggleResult(header) {
+    header.nextElementSibling.classList.toggle('open');
+  }
+
+  async function startRedirects(btn) {
+    const oldRaw = document.getElementById('r-old').value.trim();
+    const newRaw = document.getElementById('r-new').value.trim();
+    const oldUrls = oldRaw.split('\\n').map(u => u.trim()).filter(Boolean);
+    const newUrls = newRaw.split('\\n').map(u => u.trim()).filter(Boolean);
+    if (!oldUrls.length || !newUrls.length) { setStatus('r-status', 'Vul zowel oude als nieuwe URL\\'s in.', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Bezig…';
+    setStatus('r-status', 'Agent matcht de URL\\'s — dit kan even duren…', 'info');
+    document.getElementById('r-results').innerHTML = '';
+
+    try {
+      const res = await fetch('/api/redirects', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ oldUrls, newUrls, permanent: redirectPermanent }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API fout');
+
+      const table = document.createElement('table');
+      table.className = 'redirect-table';
+      table.innerHTML = \`<tr><th>Van</th><th>Naar</th><th>Zekerheid</th></tr>\` +
+        (data.redirects || []).map(r => {
+          const conf = r.confidence >= 80 ? 'high' : r.confidence >= 50 ? 'mid' : 'low';
+          return \`<tr><td>\${r.from}</td><td>\${r.to}</td><td class="conf-\${conf}">\${r.confidence}%</td></tr>\`;
+        }).join('');
+      document.getElementById('r-results').appendChild(table);
+
+      const dl = document.createElement('div');
+      dl.style.marginTop = '12px';
+      dl.innerHTML = \`<button class="btn-secondary" onclick="downloadRedirects()">↓ Download vercel.json</button>\`;
+      document.getElementById('r-results').appendChild(dl);
+      window._redirectContent = data.content;
+      window._redirectFilename = data.filename || 'vercel-redirects.json';
+
+      if (data.unmatched && data.unmatched.length) {
+        setStatus('r-status', \`✓ \${data.redirects.length} redirects gegenereerd. \${data.unmatched.length} URL's konden niet worden gematcht.\`, 'success');
+      } else {
+        setStatus('r-status', \`✓ \${data.redirects.length} redirects gegenereerd.\`, 'success');
+      }
+    } catch (err) {
+      setStatus('r-status', 'Fout: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Genereer redirect-map';
+    }
+  }
+
+  function downloadRedirects() {
+    const blob = new Blob([window._redirectContent], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = window._redirectFilename;
+    a.click();
+  }
+
+  async function startExport(btn) {
+    btn.disabled = true;
+    btn.textContent = 'Exporteren…';
+    setStatus('ex-status', 'CMS-data ophalen…', 'info');
+
+    try {
+      const res = await fetch('/api/cms-export', { method: 'POST', headers: authHeaders(), body: JSON.stringify({}) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API fout');
+
+      const bytes = atob(data.base64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = data.filename || 'cms-export.xlsx';
+      a.click();
+
+      setStatus('ex-status', \`✓ \${data.rows} items geëxporteerd.\`, 'success');
+    } catch (err) {
+      setStatus('ex-status', 'Fout: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Exporteer CMS naar Excel';
+    }
+  }
+
+  async function startImport(btn) {
+    const file = document.getElementById('imp-file').files[0];
+    if (!file) { setStatus('imp-status', 'Selecteer een bestand.', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Importeren…';
+    document.getElementById('imp-progress').classList.add('show');
+    setStatus('imp-status', 'Bestand inlezen…', 'info');
+
+    const isCsv = file.name.endsWith('.csv');
+    const mimeType = isCsv ? 'csv' : 'excel';
+    let fileData;
+
+    if (isCsv) {
+      fileData = await file.text();
+    } else {
+      const buf = await file.arrayBuffer();
+      fileData = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    }
+
+    let completed = [];
+    let done = false;
+
+    while (!done) {
+      try {
+        const res = await fetch('/api/cms-import', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ data: fileData, mimeType, operation: importOp, completed, batchSize: 10 }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'API fout');
+
+        completed = data.completed || [];
+        const total = data.progress?.total || 1;
+        const pct = Math.round(completed.length / total * 100);
+        document.getElementById('imp-progress-fill').style.width = pct + '%';
+        document.getElementById('imp-progress-label').textContent = completed.length + ' van ' + total + ' rijen verwerkt';
+
+        if (data.done) {
+          done = true;
+          setStatus('imp-status', \`✓ Import voltooid. \${completed.length} rijen verwerkt.\`, 'success');
+        }
+      } catch (err) {
+        setStatus('imp-status', 'Fout: ' + err.message, 'error');
+        break;
+      }
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Start import';
+  }
+</script>
+</body>
+</html>`;
+}
+
+function lcGenFrontendMigratieTab(base, cmsLabel, hasCms) {
+  const cmsSection = hasCms ? `
+    <div class="divider"></div>
+    <div class="section-label">CMS beheer</div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📥</div>
+        <div>
+          <div class="card-title">CMS exporteren naar Excel</div>
+          <div class="card-desc">Exporteert alle items uit je ${cmsLabel} CMS-collectie naar een downloadbare Excel. Handig als startpunt voor bulk-bewerking of als backup.</div>
+        </div>
+      </div>
+      <div class="card-when">
+        <strong>Gebruik dit voor:</strong> het ophalen van bestaande CMS-content voor review, bulk-aanpassing of migratie. Exporteer eerst, pas aan in Excel, importeer terug.
+      </div>
+      <button class="btn-primary" onclick="startExport(this)">Exporteer CMS naar Excel</button>
+      <div class="status-bar" id="ex-status"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📤</div>
+        <div>
+          <div class="card-title">Excel importeren in CMS</div>
+          <div class="card-desc">Importeer een Excel-bestand of CSV in je ${cmsLabel} CMS. Ondersteunt aanmaken, bijwerken en upsert. Verwerkt in batches van 10 rijen.</div>
+        </div>
+      </div>
+      <div class="card-when">
+        <strong>Gebruik dit voor:</strong> het bulk aanmaken of bijwerken van CMS-items. Exporteer eerst via de export-functie om de juiste kolomnamen te zien. Bij <em>update</em> is een kolom <code>_id</code> verplicht.
+      </div>
+      <div class="form-row">
+        <label>Excel of CSV bestand</label>
+        <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" style="padding:8px 0;border:none;background:none;font-size:14px" />
+      </div>
+      <div class="form-row">
+        <label>Operatie</label>
+        <div class="btn-group-row" id="import-op-group">
+          <button class="btn-opt sel" data-value="create" onclick="selectImportOp(this)">Aanmaken</button>
+          <button class="btn-opt" data-value="update" onclick="selectImportOp(this)">Bijwerken</button>
+          <button class="btn-opt" data-value="upsert" onclick="selectImportOp(this)">Upsert</button>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="startImport(this)">Start import</button>
+      <div class="progress-wrap" id="imp-progress">
+        <div class="progress-label" id="imp-progress-label">0 van 0 rijen verwerkt</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="imp-progress-fill" style="width:0%"></div></div>
+      </div>
+      <div class="status-bar" id="imp-status"></div>
+    </div>` : '';
+
+  const bulkPublishLine = hasCms
+    ? `Geef een lijst URLs op — de agent haalt elke pagina op, herschrijft hem volledig op basis van de merkregels en publiceert als concept in ${cmsLabel}. Wordt verwerkt in batches van 3.`
+    : `Geef een lijst URLs op — de agent haalt elke pagina op en herschrijft hem volledig op basis van de merkregels. Wordt verwerkt in batches van 3.`;
+
+  return `
+  <div class="tab-panel" id="tab-migratie">
+    <h1>Migratie &amp; bulk</h1>
+    <p class="page-sub">Tools voor het migreren van een bestaande website — van redirect-mapping tot bulk content genereren${hasCms ? ' en CMS-beheer' : ''}.</p>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">⚡</div>
+        <div>
+          <div class="card-title">Bulk pagina's genereren</div>
+          <div class="card-desc">${bulkPublishLine}</div>
+        </div>
+      </div>
+      <div class="card-when">
+        <strong>Gebruik dit voor:</strong> het herschrijven van een complete website of een sectie. De agent werkt door de lijst heen en toont per batch de voortgang. Je kunt hem tussendoor stoppen.
+      </div>
+
+      <div class="form-row">
+        <label>URL's om te herschrijven</label>
+        <div class="hint">Één URL per regel.</div>
+        <textarea id="m-urls" class="mono" rows="6" placeholder="${base}/diensten&#10;${base}/diensten/voorbeeld-dienst&#10;${base}/over-ons"></textarea>
+      </div>
+      <div class="form-row">
+        <label>Paginatype (voor alle URL's)</label>
+        <div class="btn-group-row" id="migrate-pagetype-group">
+          <button class="btn-opt sel" data-value="dienstpagina" onclick="selectMigratePagetype(this)">Dienstpagina</button>
+          <button class="btn-opt" data-value="artikelpagina" onclick="selectMigratePagetype(this)">Artikelpagina</button>
+          <button class="btn-opt" data-value="overig" onclick="selectMigratePagetype(this)">Overig</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Zoekwoorden (optioneel, voor alle pagina's)</label>
+        <input type="text" id="m-keywords" placeholder="primair zoekwoord, secundair zoekwoord" />
+      </div>
+      <button class="btn-primary" id="m-btn" onclick="startBulk(this)">Start bulk generatie</button>
+      <div class="progress-wrap" id="m-progress">
+        <div class="progress-label" id="m-progress-label">0 van 0 pagina's verwerkt</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="m-progress-fill" style="width:0%"></div></div>
+      </div>
+      <div class="status-bar" id="m-status"></div>
+      <div class="results-list" id="m-results"></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Redirects</div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">↪️</div>
+        <div>
+          <div class="card-title">Redirect mapping</div>
+          <div class="card-desc">De agent matcht oude URL's semantisch aan nieuwe URL's en genereert een configuratiebestand voor Vercel. Werkt op basis van inhoud en structuur — niet alleen op exacte paden.</div>
+        </div>
+      </div>
+      <div class="card-when">
+        <strong>Gebruik dit voor:</strong> een websitemigratie waarbij URL-structuren veranderen. Lever de oude sitemap en de nieuwe URL-structuur aan — de agent regelt de koppeling.
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-row">
+          <label>Oude URL's</label>
+          <div class="hint">Één per regel. Paden of volledige URL's.</div>
+          <textarea id="r-old" class="mono" rows="8" placeholder="/oud-pad-1&#10;/oud-pad-2"></textarea>
+        </div>
+        <div class="form-row">
+          <label>Nieuwe URL's</label>
+          <div class="hint">De nieuwe structuur — één per regel.</div>
+          <textarea id="r-new" class="mono" rows="8" placeholder="/nieuw-pad-1&#10;/nieuw-pad-2"></textarea>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Type redirect</label>
+        <div class="btn-group-row" id="redirect-type-group">
+          <button class="btn-opt sel" data-value="true" onclick="selectRedirectType(this)">301 — Permanent</button>
+          <button class="btn-opt" data-value="false" onclick="selectRedirectType(this)">302 — Tijdelijk</button>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="startRedirects(this)">Genereer redirect-map</button>
+      <div class="status-bar" id="r-status"></div>
+      <div id="r-results" style="margin-top:16px"></div>
+    </div>
+${cmsSection}
+  </div>`;
+}
+
+function lcGenFrontendApiMig(hasCms) {
+  const cmsRows = hasCms ? `
+    <div class="api-card">
+      <div><span class="api-method">POST</span><span class="api-path">/api/cms-export</span></div>
+      <div class="api-desc">Exporteert alle items uit een CMS-collectie naar een downloadbare Excel.</div>
+      <div class="api-fields">
+        <table>
+          <tr><th>Veld</th><th>Type</th><th>Verplicht</th><th>Omschrijving</th></tr>
+          <tr><td><code>collectionId</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>Overschrijft de standaard collectie-ID</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div><span class="api-method">POST</span><span class="api-path">/api/cms-import</span></div>
+      <div class="api-desc">Importeert een Excel of CSV in het CMS in batches. Herhaal met <code>completed</code> tot <code>done: true</code>.</div>
+      <div class="api-fields">
+        <table>
+          <tr><th>Veld</th><th>Type</th><th>Verplicht</th><th>Omschrijving</th></tr>
+          <tr><td><code>data</code></td><td>string</td><td><span class="tag-required">Verplicht</span></td><td>Base64-encoded Excel of CSV-tekst</td></tr>
+          <tr><td><code>mimeType</code></td><td>string</td><td><span class="tag-required">Verplicht</span></td><td><code>excel</code> of <code>csv</code></td></tr>
+          <tr><td><code>operation</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>create / update / upsert (standaard: create)</td></tr>
+          <tr><td><code>completed</code></td><td>number[]</td><td><span class="tag-optional">Optioneel</span></td><td>Al verwerkte rij-indices</td></tr>
+          <tr><td><code>batchSize</code></td><td>number</td><td><span class="tag-optional">Optioneel</span></td><td>Rijen per batch (standaard: 10)</td></tr>
+        </table>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="api-card">
+      <div><span class="api-method">POST</span><span class="api-path">/api/migrate</span></div>
+      <div class="api-desc">Herschrijft een lijst pagina's in batches. Herhaal de aanroep met het teruggegeven <code>completed</code>-array tot <code>done: true</code>.</div>
+      <div class="api-fields">
+        <table>
+          <tr><th>Veld</th><th>Type</th><th>Verplicht</th><th>Omschrijving</th></tr>
+          <tr><td><code>urls</code></td><td>string[]</td><td><span class="tag-required">Verplicht</span></td><td>Alle URL's om te verwerken</td></tr>
+          <tr><td><code>completed</code></td><td>string[]</td><td><span class="tag-optional">Optioneel</span></td><td>Al verwerkte URL's (stuur terug wat de vorige call gaf)</td></tr>
+          <tr><td><code>batchSize</code></td><td>number</td><td><span class="tag-optional">Optioneel</span></td><td>Aantal URL's per batch (standaard: 3)</td></tr>
+          <tr><td><code>pageType</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>Paginatype voor alle URL's</td></tr>
+          <tr><td><code>keywords</code></td><td>string</td><td><span class="tag-optional">Optioneel</span></td><td>Zoekwoorden voor alle pagina's</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div><span class="api-method">POST</span><span class="api-path">/api/redirects</span></div>
+      <div class="api-desc">Matcht oude URL's semantisch aan nieuwe URL's en genereert een redirect-configuratie voor Vercel, Netlify, .htaccess of Nginx.</div>
+      <div class="api-fields">
+        <table>
+          <tr><th>Veld</th><th>Type</th><th>Verplicht</th><th>Omschrijving</th></tr>
+          <tr><td><code>oldUrls</code></td><td>string[]</td><td><span class="tag-required">Verplicht</span></td><td>Lijst van oude URL's of paden</td></tr>
+          <tr><td><code>newUrls</code></td><td>string[]</td><td><span class="tag-required">Verplicht</span></td><td>Lijst van nieuwe URL's</td></tr>
+          <tr><td><code>permanent</code></td><td>boolean</td><td><span class="tag-optional">Optioneel</span></td><td>301 (permanent) of 302 (tijdelijk) — standaard: true</td></tr>
+        </table>
+      </div>
+    </div>
+${cmsRows}`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
