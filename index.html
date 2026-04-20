@@ -6,6 +6,7 @@
   <title>Content Agent Prompt Builder — Goldfizh</title>
   <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
     :root {
       --purple:          #6331F4;
@@ -1342,25 +1343,42 @@ function handleFiles(fileList) {
     }
     if (uploadedFiles.find(f => f.name === file.name)) return;
 
-    const reader = new FileReader();
     const isPdf = file.type === 'application/pdf';
+    const isDocx = file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc');
 
-    reader.onload = e => {
-      const data = isPdf
-        ? e.target.result.split(',')[1] // base64 only
-        : e.target.result;              // plain text
-
-      uploadedFiles.push({
-        name: file.name,
-        size: file.size,
-        mediaType: isPdf ? 'application/pdf' : 'text/plain',
-        data,
-      });
-      renderUploadedFiles();
-    };
-
-    if (isPdf) reader.readAsDataURL(file);
-    else reader.readAsText(file);
+    if (isDocx) {
+      const reader = new FileReader();
+      reader.onload = async e => {
+        try {
+          const result = await mammoth.extractRawText({ arrayBuffer: e.target.result });
+          uploadedFiles.push({
+            name: file.name,
+            size: file.size,
+            mediaType: 'text/plain',
+            data: result.value,
+          });
+          renderUploadedFiles();
+        } catch (err) {
+          status.textContent = `"${file.name}" kon niet worden gelezen: ${err.message}`;
+          status.className = 'analyse-status error';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const data = isPdf ? e.target.result.split(',')[1] : e.target.result;
+        uploadedFiles.push({
+          name: file.name,
+          size: file.size,
+          mediaType: isPdf ? 'application/pdf' : 'text/plain',
+          data,
+        });
+        renderUploadedFiles();
+      };
+      if (isPdf) reader.readAsDataURL(file);
+      else reader.readAsText(file);
+    }
   });
 }
 
