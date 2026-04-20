@@ -1273,7 +1273,7 @@
 
       <div class="field" style="margin-top:20px">
         <label>Naam van de environment variable voor de CMS API-key</label>
-        <input type="text" id="lc-cms-keyname" placeholder="CMS_API_KEY" />
+        <input type="text" id="lc-cms-keyname" placeholder="WEBFLOW_API_KEY" oninput="this.dataset.manuallyEdited='1'" />
       </div>
 
       <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--light-grey)">
@@ -3091,6 +3091,12 @@ function selectLcCms(platform) {
   document.querySelectorAll('.lc-cms-btn').forEach(b => b.classList.toggle('selected', b.dataset.value === platform));
   const row = document.getElementById('lc-endpoint-row');
   if (row) row.style.display = platform === 'andere' ? 'none' : '';
+  // Auto-fill key name based on platform
+  const keyField = document.getElementById('lc-cms-keyname');
+  if (keyField && !keyField.dataset.manuallyEdited) {
+    const defaults = { webflow: 'WEBFLOW_API_KEY', contentful: 'CONTENTFUL_MANAGEMENT_TOKEN', prepr: 'PREPR_API_KEY', headless: 'CMS_API_KEY', andere: 'CMS_API_KEY' };
+    keyField.value = defaults[platform] || 'CMS_API_KEY';
+  }
 }
 
 async function confirmLangChainDownload() {
@@ -3704,13 +3710,16 @@ function lcGenToolWritePage() {
     '        ? brand + "\\n\\n---\\n\\n" + templates + "\\n\\n---\\n\\n" + knowledge',
     '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + templates + "\\n\\n---\\n\\n" + knowledge;',
     '      const userPrompt = isCaseType',
-    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + '\\n\\nLever op: titel en volledige tekst in Markdown. Geen meta_title of meta_description verplicht.'",
-    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + '\\n\\nLever op: meta_title, meta_description, slug en volledige paginatekst in Markdown.';",
+    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
+    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...\",\"meta_description\":\"...\",\"slug\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}';",
     '      const response = await model.invoke([',
     "        { role: 'system', content: systemContent },",
     "        { role: 'user',   content: userPrompt }",
     '      ]);',
-    "      return JSON.stringify({ success: true, page: { content: response.content, ai_generated: true, generated_at: new Date().toISOString() } });",
+    "      const raw = typeof response.content === 'string' ? response.content : (response.content[0]?.text || '');",
+    '      const match = raw.match(/{[\\s\\S]*}/);',
+    "      const page = match ? (() => { try { return JSON.parse(match[0]); } catch { return { content: raw }; } })() : { content: raw };",
+    "      return JSON.stringify({ success: true, page: { ...page, ai_generated: true, generated_at: new Date().toISOString() } });",
     '    } catch (err) {',
     '      return JSON.stringify({ success: false, error: err.message });',
     '    }',
@@ -3793,11 +3802,10 @@ function lcGenToolLoadKnowledge() {
     "import { tool } from '@langchain/core/tools';",
     "import { z } from 'zod';",
     "import { readFileSync } from 'fs';",
-    "import { join, dirname } from 'path';",
-    "import { fileURLToPath } from 'url';",
+    "import { join } from 'path';",
     '',
-    'const __dirname = dirname(fileURLToPath(import.meta.url));',
-    "const KNOWLEDGE_DIR = join(__dirname, '../../knowledge');",
+    '// process.cwd() = projectroot in Vercel; __dirname werkt niet betrouwbaar in ESM-functies',
+    "const KNOWLEDGE_DIR = join(process.cwd(), 'knowledge');",
     '',
     'export async function readKnowledge() {',
     '  const read = name => {',
@@ -3845,7 +3853,7 @@ function lcGenToolPublishCms(cms) {
       '        body: JSON.stringify({',
       '          isArchived: false,',
       '          isDraft: true,',
-      "          fieldData: { name: slug, slug, 'post-body': content }",
+      "          fieldData: { name: meta_title || slug, slug, 'post-body': content, 'meta-title': meta_title || '', 'meta-description': meta_description || '' }",
       '        })',
       '      });',
       '      if (!res.ok) throw new Error(\'Webflow API fout: \' + res.status);',
@@ -3920,7 +3928,7 @@ function lcGenToolPublishCms(cms) {
     ' * Databron: CMS API (' + ({ webflow:'Webflow Data API v2', contentful:'Contentful Management API', prepr:'Prepr GraphQL API', headless:'Headless/REST API', andere:'nog te configureren' }[cms.platform]) + ')',
     ' * Gebruik wanneer: een gevalideerde pagina als concept gepubliceerd moet worden',
     ' * Gebruik NIET voor: pagina\'s die validate_output niet hebben doorstaan',
-    ' * Input: { slug: string, content: string }',
+    ' * Input: { slug, content, meta_title?, meta_description? }',
     ' * Succes: { success: true, ...platform-specifiek }',
     ' * Fout:   { success: false, error }',
     ' */',
@@ -3928,7 +3936,7 @@ function lcGenToolPublishCms(cms) {
     "import { z } from 'zod';",
     '',
     'export const publishCmsTool = tool(',
-    '  async ({ slug, content }) => {',
+    '  async ({ slug, content, meta_title = \'\', meta_description = \'\' }) => {',
     '    try {',
     body,
     '    } catch (err) {',
@@ -3939,8 +3947,10 @@ function lcGenToolPublishCms(cms) {
     "    name: 'publish_to_cms',",
     "    description: 'Publiceer een gevalideerde pagina als concept naar het CMS. Gebruik dit ALLEEN na validate_output met passed: true.',",
     '    schema: z.object({',
-    "      slug:    z.string().describe('URL-slug van de pagina'),",
-    "      content: z.string().describe('Volledige paginatekst in Markdown')",
+    "      slug:             z.string().describe('URL-slug van de pagina'),",
+    "      content:          z.string().describe('Volledige paginatekst in Markdown'),",
+    "      meta_title:       z.string().optional().describe('SEO-titel (max 65 tekens)'),",
+    "      meta_description: z.string().optional().describe('SEO-beschrijving (max 155 tekens)')",
     '    })',
     '  }',
     ');',
