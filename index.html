@@ -792,6 +792,39 @@
     }
     .btn-add:hover { border-color: var(--purple-light); color: var(--purple); background: var(--white); }
 
+    .extra-knowledge-dropzone {
+      border: 1.5px dashed var(--light-grey);
+      border-radius: 10px;
+      padding: 18px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--mid-grey);
+      cursor: pointer;
+      background: var(--off-white);
+      transition: all 0.15s;
+    }
+    .extra-knowledge-dropzone:hover,
+    .extra-knowledge-dropzone.drag {
+      border-color: var(--purple);
+      color: var(--purple);
+      background: var(--white);
+    }
+    .extra-knowledge-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px;
+      background: var(--off-white);
+      border: 1px solid var(--light-grey);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .extra-knowledge-item .name { flex: 1; color: var(--near-black); word-break: break-all; }
+    .extra-knowledge-item .size { color: var(--mid-grey); font-size: 12px; white-space: nowrap; }
+    .extra-knowledge-item .remove {
+      width: 22px; height: 22px; border: none; background: transparent;
+      color: var(--mid-grey); cursor: pointer; font-size: 16px; line-height: 1;
+    }
+    .extra-knowledge-item .remove:hover { color: #C0392B; }
+
     .btn-remove {
       width: 28px;
       height: 28px;
@@ -1123,7 +1156,12 @@
 
     <div class="field">
       <label>Hoofdpagina's van de website</label>
-      <div class="hint">De navigatiestructuur van de site — één URL per regel. Denk aan: homepage, over ons, werkwijze, diensten-overzicht, contact, kennisbank. <strong>Niet</strong> de individuele product- of dienstpagina's (die vul je in bij Productcatalogus). 10–15 URL's is genoeg.</div>
+      <div class="hint">De navigatiestructuur van de site — één URL per regel. Denk aan: homepage, over ons, werkwijze, diensten-overzicht, contact, kennisbank. <strong>Niet</strong> de individuele product- of dienstpagina's (die vul je in bij Productcatalogus). 10–15 URL's is genoeg. Sneller: sitemap-URL hieronder invullen en ophalen.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="sitemap-fetch-url" placeholder="https://www.voorbeeld.nl/sitemap.xml (of alleen het domein)" style="flex:1;font-size:13px;font-family:monospace" />
+        <button type="button" class="btn-option" onclick="fetchSitemapFromUrl(this)" style="white-space:nowrap">↓ Ophalen &amp; invullen</button>
+      </div>
+      <div id="sitemap-fetch-status" style="font-size:12px;margin-bottom:8px;display:none"></div>
       <textarea id="SITEMAP_URLS" placeholder="https://www.voorbeeld.nl/&#10;https://www.voorbeeld.nl/over-ons&#10;https://www.voorbeeld.nl/diensten&#10;https://www.voorbeeld.nl/contact" style="min-height:100px;font-size:13px;font-family:monospace"></textarea>
     </div>
   </div>
@@ -1154,6 +1192,16 @@
         <input type="text" placeholder="Typ en druk Enter…" onkeydown="handleChipKey(event,'externe-bronnen')" />
       </div>
     </div>
+
+    <div class="field">
+      <label>Aanvullende kennisbestanden <span style="font-weight:400;color:var(--mid-grey)">(optioneel)</span></label>
+      <div class="hint">Documenten die de agent tijdens het schrijven mag raadplegen als bron — denk aan whitepapers, handboeken, productcatalogi, of specifieke regelgeving-pdf's. Worden meegeleverd in de ZIP onder <code>knowledge/bronnen/</code>. PDF, DOCX, MD of TXT (max 5 MB per bestand).</div>
+      <div id="extra-knowledge-dropzone" class="extra-knowledge-dropzone" onclick="document.getElementById('extra-knowledge-input').click()">
+        <input type="file" id="extra-knowledge-input" multiple accept=".pdf,.docx,.doc,.md,.txt" onchange="handleExtraKnowledge(this.files)" style="display:none" />
+        <span>+ Klik hier of sleep bestanden hierheen</span>
+      </div>
+      <div id="extra-knowledge-list" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+    </div>
   </div>
 
   <!-- Productcatalogus -->
@@ -1167,10 +1215,11 @@
 
   <!-- Merktermen -->
   <div class="section-card">
-    <div class="section-label"><div class="section-square"></div><span>Merktermen</span></div>
-    <div class="hint" style="margin-bottom:20px">Termen die de agent consequent in content verwerkt om op termijn een sterke associatie te bouwen tussen het merk en deze woorden. Denk aan zoektermen, concepten of woordcombinaties die je aan het merk wil koppelen — bijv. "online boeken", "vakantie plannen", "reviewplatform". Voeg per term een korte uitleg toe over hoe of wanneer de term het best gebruikt wordt.</div>
+    <div class="section-label"><div class="section-square"></div><span>Merktermen (entiteiten)</span></div>
+    <div class="hint" style="margin-bottom:20px">Brede termen die de agent op <strong>elke pagina</strong> verwerkt om op termijn sterke merkassociatie te bouwen. <strong>Regels:</strong> maximaal <strong>10 termen</strong>, maximaal <strong>3 woorden per term</strong>, moet op élke pagina passen (homepage, dienstpagina, artikel). Pagina-specifieke zoektermen (zoals "whiplash vergoeding" voor een letselschade-kantoor) horen hier <strong>niet</strong>; die zitten in de contentstrategie.</div>
     <div class="paired-list" id="paired-merktermen"></div>
     <button class="btn-add" style="margin-top:8px" onclick="addPairedItem('merktermen')">+ Merkterm toevoegen</button>
+    <div id="merktermen-warning" style="margin-top:10px;font-size:12px;color:var(--dark-grey);display:none"></div>
   </div>
 
 
@@ -1343,6 +1392,7 @@ window.onerror = function(msg, src, line, col) {
 // ── File upload ────────────────────────────────────────────────────────────
 let uploadedFiles = []; // { name, size, mediaType, data }
 let customTemplateFile = null; // { name, size, data, isPdf }
+let extraKnowledgeFiles = []; // { name, size, isBinary, data } — meegeleverd in ZIP onder knowledge/bronnen/
 
 const uploadZone = document.getElementById('upload-zone');
 uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
@@ -1505,6 +1555,81 @@ function removeTemplateFile() {
   if (inp) inp.value = '';
   renderTemplateFile();
 }
+
+// ── Aanvullende kennisbestanden ────────────────────────────────────────────
+function handleExtraKnowledge(fileList) {
+  const files = Array.from(fileList || []);
+  const MAX_SIZE = 5 * 1024 * 1024;
+  const allowedExts = /\.(pdf|docx?|md|txt)$/i;
+
+  for (const file of files) {
+    if (!allowedExts.test(file.name)) {
+      alert(`"${file.name}" heeft een ongeldige extensie (alleen PDF, DOCX, MD, TXT).`);
+      continue;
+    }
+    if (file.size > MAX_SIZE) {
+      alert(`"${file.name}" is te groot (max. 5 MB).`);
+      continue;
+    }
+    if (extraKnowledgeFiles.find(f => f.name === file.name)) continue;
+
+    const isBinary = /\.(pdf|docx?)$/i.test(file.name);
+    const reader = new FileReader();
+    reader.onload = e => {
+      extraKnowledgeFiles.push({
+        name: file.name,
+        size: file.size,
+        isBinary,
+        data: isBinary ? e.target.result.split(',')[1] : e.target.result,
+      });
+      renderExtraKnowledge();
+    };
+    if (isBinary) reader.readAsDataURL(file);
+    else reader.readAsText(file);
+  }
+
+  const inp = document.getElementById('extra-knowledge-input');
+  if (inp) inp.value = '';
+}
+
+function renderExtraKnowledge() {
+  const list = document.getElementById('extra-knowledge-list');
+  if (!list) return;
+  list.innerHTML = '';
+  extraKnowledgeFiles.forEach((f, i) => {
+    const kb = f.size < 1024 * 1024
+      ? Math.round(f.size / 1024) + ' KB'
+      : (f.size / 1024 / 1024).toFixed(1) + ' MB';
+    const row = document.createElement('div');
+    row.className = 'extra-knowledge-item';
+    row.innerHTML = `
+      <span class="name">${escapeHtml(f.name)}</span>
+      <span class="size">${kb}</span>
+      <button class="remove" onclick="removeExtraKnowledge(${i})" title="Verwijder">×</button>`;
+    list.appendChild(row);
+  });
+}
+
+function removeExtraKnowledge(i) {
+  extraKnowledgeFiles.splice(i, 1);
+  renderExtraKnowledge();
+}
+
+(function initExtraKnowledgeDropzone() {
+  const zone = document.getElementById('extra-knowledge-dropzone');
+  if (!zone) return;
+  ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.add('drag');
+  }));
+  ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.remove('drag');
+  }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer?.files?.length) handleExtraKnowledge(e.dataTransfer.files);
+  });
+})();
 
 const templateUploadZone = document.getElementById('template-upload-zone');
 if (templateUploadZone) {
@@ -1889,19 +2014,36 @@ function renderPaired(id) {
     row.style.flexWrap = hasUrl ? 'wrap' : '';
     let html = `
       <input type="text" value="${escapeHtml(item.naam)}" placeholder="${ph[0]}"
-        oninput="pairedData['${id}'][${i}].naam=this.value;updateProgress()" />
+        oninput="pairedData['${id}'][${i}].naam=this.value;updateProgress();if('${id}'==='merktermen')updateMerktermenWarning()" />
       <input type="text" value="${escapeHtml(item.desc)}" placeholder="${ph[1]}"
         oninput="pairedData['${id}'][${i}].desc=this.value;updateProgress()" />`;
     if (hasUrl) {
-      html += `<input type="text" value="${escapeHtml(item.url || '')}" placeholder="${ph[2]}"
-        style="flex-basis:100%;margin-top:4px"
-        oninput="pairedData['${id}'][${i}].url=this.value;updateProgress()" />`;
+      html += `<div style="flex-basis:100%;margin-top:6px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:600;color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap">URL</span>
+        <input type="text" value="${escapeHtml(item.url || '')}" placeholder="${ph[2]}"
+          style="flex:1;font-family:monospace;font-size:13px"
+          oninput="pairedData['${id}'][${i}].url=this.value;updateProgress()" />
+      </div>`;
     }
     html += `<button class="btn-remove" onclick="removePaired('${id}',${i})" title="Verwijder">×</button>`;
     row.innerHTML = html;
     container.appendChild(row);
   });
+  if (id === 'merktermen') updateMerktermenWarning();
   updateProgress();
+}
+
+function updateMerktermenWarning() {
+  const warn = document.getElementById('merktermen-warning');
+  if (!warn) return;
+  const items = (pairedData['merktermen'] || []).filter(t => t.naam && t.naam.trim());
+  const issues = [];
+  if (items.length > 10) issues.push('Te veel merktermen: ' + items.length + ' (max 10). Kies je 10 sterkste.');
+  const longTerms = items.filter(t => t.naam.trim().split(/\s+/).length > 3);
+  if (longTerms.length) issues.push('Te lang (> 3 woorden): ' + longTerms.map(t => '"' + t.naam + '"').join(', '));
+  warn.textContent = issues.length ? '⚠ ' + issues.join(' · ') : '';
+  warn.style.display = issues.length ? '' : 'none';
+  warn.style.color = issues.length ? '#C0392B' : '';
 }
 
 function removePaired(id, i) {
@@ -2250,6 +2392,10 @@ function generateSystemPromptMd() {
     ? `\n> **Eigen template aanwezig:** gebruik \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` als **enige** actieve template voor paginastructuur. Negeer de standaardsjablonen in \`templates.md\` — die dienen alleen als fallback als het eigen template een onderdeel niet dekt.\n`
     : '';
 
+  const bronnenNote = extraKnowledgeFiles.length
+    ? `\n\n### Aanvullende kennisbronnen — \`knowledge/bronnen/\`\n\nDeze map bevat extra documenten die je mag raadplegen als bron bij het schrijven:\n\n${extraKnowledgeFiles.map(f => `- \`knowledge/bronnen/${f.name}\``).join('\n')}\n\nRaadpleeg deze bestanden wanneer inhoudelijk relevant. Citeer alleen wat er letterlijk in staat; verzin niets.`
+    : '';
+
   return `# ${client} Content Agent — Instructies
 
 Geconfigureerd door ${agency}.
@@ -2279,7 +2425,7 @@ Raadpleeg de volgende bijlagen **altijd en volledig** voordat je begint met schr
 
 **Prioriteitsregel:** de inhoud van \`brand.md\` heeft altijd voorrang op de algemene schrijfkwaliteitsregels in deze instructies. Als de geconfigureerde tone of voice afwijkt van de standaardregels hieronder, volg dan \`brand.md\`.
 
-Zijn er extra bestanden bijgevoegd? Raadpleeg die ook. Ontbreekt een genoemde bijlage? Meld dit en wacht op bevestiging voordat je verdergaat.
+Zijn er extra bestanden bijgevoegd? Raadpleeg die ook. Ontbreekt een genoemde bijlage? Meld dit en wacht op bevestiging voordat je verdergaat.${bronnenNote}
 
 ---
 
@@ -2915,18 +3061,68 @@ function parseSitemap(xmlText) {
   } catch { return null; }
 }
 
-function applySitemapToForm(data) {
+async function fetchSitemapFromUrl(btn) {
+  const input = document.getElementById('sitemap-fetch-url');
+  const status = document.getElementById('sitemap-fetch-status');
+  const raw = input.value.trim();
+  if (!raw) {
+    status.textContent = 'Geef een URL op (sitemap.xml of alleen een domein).';
+    status.style.display = '';
+    status.style.color = '#C0392B';
+    return;
+  }
+
+  let url = raw;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Ophalen…';
+  status.textContent = 'Sitemap ophalen…';
+  status.style.display = '';
+  status.style.color = 'var(--mid-grey)';
+
+  try {
+    const res = await fetch('/api/fetch-sitemap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Onbekende fout');
+
+    const parsed = parseSitemap(data.xml);
+    if (!parsed) throw new Error('Sitemap ontvangen maar niet parseerbaar.');
+
+    parsedSitemapData = parsed;
+    const nameField = document.getElementById('SITEMAP_BESTANDSNAAM');
+    if (nameField && !nameField.value.trim()) nameField.value = 'sitemap.xml';
+    applySitemapToForm(parsed, { force: true });
+
+    const clusters = parsed.clusters.length ? ` · ${parsed.clusters.length} cluster${parsed.clusters.length !== 1 ? 's' : ''}` : '';
+    status.textContent = `✓ Sitemap opgehaald van ${data.fetchedUrl}: ${parsed.total} URL's · ${parsed.navUrls.length} nav · ${parsed.productUrls.length} product/dienst${clusters}`;
+    status.style.color = '#1A7A45';
+  } catch (err) {
+    status.textContent = 'Fout: ' + err.message;
+    status.style.color = '#C0392B';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origLabel;
+  }
+}
+
+function applySitemapToForm(data, { force = false } = {}) {
   // Fill SITEMAP_URLS with nav + service pages (max 20)
   const topUrls = [...new Set([...data.navUrls, ...data.productUrls])].slice(0, 20);
   const urlField = document.getElementById('SITEMAP_URLS');
-  if (urlField && !urlField.value.trim()) {
+  if (urlField && (force || !urlField.value.trim())) {
     urlField.value = topUrls.join('\n');
     urlField.classList.add('ai-filled');
   }
 
-  // Pre-fill producten if empty
+  // Pre-fill producten if empty (or force)
   const existing = getPaired('producten').filter(p => p.naam);
-  if (!existing.length && data.productUrls.length) {
+  if ((force || !existing.length) && data.productUrls.length) {
     pairedData['producten'] = data.productUrls.slice(0, 12).map(u => {
       const parts = new URL(u).pathname.replace(/\/$/, '').split('/').filter(Boolean);
       const slug = parts[parts.length - 1] || '';
@@ -3077,6 +3273,12 @@ async function _doDownloadCustomAgent() {
         zip.file('custom-template.md', customTemplateFile.data);
       }
     }
+
+    // Include aanvullende kennisbestanden
+    extraKnowledgeFiles.forEach(f => {
+      if (f.isBinary) zip.file('knowledge/bronnen/' + f.name, f.data, { base64: true });
+      else           zip.file('knowledge/bronnen/' + f.name, f.data);
+    });
 
     const blob = await zip.generateAsync({ type: 'blob' });
     const url  = URL.createObjectURL(blob);
@@ -3238,6 +3440,12 @@ async function generateAndDownloadLangChain(cmsConfig, migrationConfig = {}, rev
       if (knowledge) zip.file('knowledge/domain-' + dc + '.md', knowledge);
     });
   }
+
+  // Aanvullende kennisbestanden (knowledge/bronnen/…)
+  extraKnowledgeFiles.forEach(f => {
+    if (f.isBinary) zip.file('knowledge/bronnen/' + f.name, f.data, { base64: true });
+    else           zip.file('knowledge/bronnen/' + f.name, f.data);
+  });
   zip.file('lib/tools/index.js',       lcGenToolsIndex(mig));
   zip.file('lib/tools/fetch-url.js',   lcGenToolFetchUrl());
   zip.file('lib/tools/consolidate.js', lcGenToolConsolidate());
@@ -4147,6 +4355,9 @@ function lcGenPrompts(cfg, migration = false, reviewEnabled = false) {
     ? cfg.guardrails.map(g => '- ' + g.naam + (g.desc ? ' — ' + g.desc : '')).join('\n')
     : '- Verzin nooit feiten die niet in de kennisbank staan';
   const verboden = cfg.verboden.length ? cfg.verboden.join(', ') : '(geen)';
+  const bronnenLine = extraKnowledgeFiles.length
+    ? 'AANVULLENDE BRONNEN: in de map knowledge/bronnen/ staan ' + extraKnowledgeFiles.length + ' documenten (' + extraKnowledgeFiles.map(f => f.name).join(', ') + '). Raadpleeg deze wanneer inhoudelijk relevant. Citeer alleen wat er letterlijk in staat; verzin niets.'
+    : '';
 
   const parts = [
     'Je bent de content agent van ' + cfg.client + ', geconfigureerd door ' + cfg.agency + '.',
@@ -4172,6 +4383,8 @@ function lcGenPrompts(cfg, migration = false, reviewEnabled = false) {
     '',
     'INTAKEVRAGEN PER PAGINATYPE: elk paginatype in templates.md heeft aanvullende intakevragen. Raadpleeg templates.md na ontvangst van het paginatype en stel de bijbehorende vragen in hetzelfde bericht — tenzij al beantwoord.',
     '',
+    bronnenLine || null,
+    bronnenLine ? '' : null,
     'CONTENT-WERKWIJZE:',
     '1. Laad altijd eerst de relevante kennisbestanden via load_knowledge',
     '2. Haal bronpagina\'s op via fetch_url_content als URL\'s zijn meegegeven',

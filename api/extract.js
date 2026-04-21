@@ -3,15 +3,24 @@ Vul alleen in wat je met zekerheid kunt afleiden uit de documenten.
 Laat velden leeg ("" of []) als de informatie niet aanwezig is.
 Geef ALLEEN de JSON terug, geen uitleg, geen markdown code blocks.
 
-BELANGRIJK voor het veld "merktermen":
+BELANGRIJK voor het veld "merktermen" (entiteiten):
 Dit zijn GEEN slogans, merkwaarden of interne termen.
-Dit zijn zoektermen waarop potentiële klanten zoeken in Google — denk aan:
-- de diensten of producten bij naam (zoals de doelgroep ze noemt, niet de organisatie)
-- veelgestelde vragen of problemen die de doelgroep heeft
-- vakjargon dat de doelgroep begrijpt of zelf gebruikt
-- synoniemen en alternatieve formuleringen voor hetzelfde probleem
-Voorbeeld voor een letselschade advocaat: "letselschade", "smartengeld", "schadevergoeding na ongeluk", "advocaat letsel", "aansprakelijkheid werkgever", "whiplash vergoeding"
-Voorbeeld voor een boekhouder: "boekhouder zzp", "btw aangifte", "jaarrekening opstellen", "administratie uitbesteden"
+Dit zijn brede zoek-entiteiten waar de merkassociatie van de organisatie op gebouwd wordt.
+
+HARDE EISEN:
+- MAXIMAAL 10 merktermen (liever 6–8 sterke dan 10 middelmatige)
+- MAXIMAAL 3 woorden per term
+- Elke term moet op ELKE pagina van deze klant passen — niet slechts op één specifieke pagina
+
+Gebruik de "elke pagina"-test: past de term op zowel de homepage, een dienstpagina over onderwerp A, als een artikel over onderwerp B? Zo ja: merkterm. Zo nee: weglaten (die zijn te specifiek en horen in de contentstrategie, niet in de merktermen).
+
+Voorbeeld letselschade advocaat:
+  ✓ "letselschade", "smartengeld berekenen", "schadevergoeding" — breed inzetbaar, passen op elke pagina
+  ✗ "whiplash vergoeding", "verkeersongeval advocaat" — te pagina-specifiek, wel SEO-relevant maar geen merkterm
+
+Voorbeeld boekhouder:
+  ✓ "boekhouder zzp", "administratie uitbesteden", "online boekhouden" — brede merkassociatie
+  ✗ "btw aangifte 2026", "ZZP jaarrekening" — te specifiek/tijdelijk
 
 {
   "CLIENT_NAME": "officiële naam van de organisatie",
@@ -37,7 +46,7 @@ Voorbeeld voor een boekhouder: "boekhouder zzp", "btw aangifte", "jaarrekening o
   "strategie": ["redactioneel principe 1", "redactioneel principe 2"],
   "pijlers": [{"naam": "pijlernaam", "desc": "hoe dit terugkomt in toon of inhoud (één zin)"}],
   "producten": [{"naam": "productnaam", "desc": "kernfunctie of voornaamste voordeel", "url": "relatieve of absolute URL indien bekend"}],
-  "merktermen": [{"term": "zoekterm zoals doelgroep die intypt in Google", "uitleg": "bij welke dienst of pagina inzetten"}],
+  "merktermen": [{"term": "brede merkterm (max 3 woorden, passend op elke pagina)", "uitleg": "waarom dit een merkterm is en niet een pagina-specifieke zoekterm"}],
   "intakevragen": {
     "dienstpagina": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"],
     "productpagina": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"],

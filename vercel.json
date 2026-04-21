@@ -2,6 +2,9 @@
   "functions": {
     "api/extract.js": {
       "maxDuration": 60
+    },
+    "api/fetch-sitemap.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
