@@ -1158,9 +1158,10 @@
       <label>Hoofdpagina's van de website</label>
       <div class="hint">De navigatiestructuur van de site — één URL per regel. Denk aan: homepage, over ons, werkwijze, diensten-overzicht, contact, kennisbank. <strong>Niet</strong> de individuele product- of dienstpagina's (die vul je in bij Productcatalogus). 10–15 URL's is genoeg. Sneller: sitemap-URL hieronder invullen en ophalen.</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input type="text" id="sitemap-fetch-url" placeholder="https://www.voorbeeld.nl/sitemap.xml (of alleen het domein)" style="flex:1;font-size:13px;font-family:monospace" />
+        <input type="text" id="sitemap-fetch-url" placeholder="https://www.voorbeeld.nl — of sitemap.xml, of robots.txt" style="flex:1;font-size:13px;font-family:monospace" />
         <button type="button" class="btn-option" onclick="fetchSitemapFromUrl(this)" style="white-space:nowrap">↓ Ophalen &amp; invullen</button>
       </div>
+      <div class="hint" style="margin-top:-6px;margin-bottom:10px;font-size:11px">Werkt met domein, sitemap.xml of robots.txt. Als de server blokkeert of geen sitemap heeft: upload hem direct als <code>.xml</code> in het uploadvak bovenaan, of vul de URL's hieronder handmatig in.</div>
       <div id="sitemap-fetch-status" style="font-size:12px;margin-bottom:8px;display:none"></div>
       <textarea id="SITEMAP_URLS" placeholder="https://www.voorbeeld.nl/&#10;https://www.voorbeeld.nl/over-ons&#10;https://www.voorbeeld.nl/diensten&#10;https://www.voorbeeld.nl/contact" style="min-height:100px;font-size:13px;font-family:monospace"></textarea>
     </div>
