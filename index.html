@@ -2800,7 +2800,8 @@ function stijldocToMd() {
 function generateSetupMd() {
   const client = orFallback(val('CLIENT_NAME'), 'de klant');
   const today  = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
-  const sitemap = orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml');
+  // Sitemap.xml hoeft NIET als kennisbijlage; URL-lijst zit al in seo.md / knowledge.md
+  const brandFiles = uploadedFiles.filter(f => !f.name.toLowerCase().endsWith('.xml'));
   return `# Installatie — ${client} Content Agent
 
 Gegenereerd ${today}.
@@ -2818,16 +2819,17 @@ In deze volgorde:
 3. \`templates.md\`
 4. \`knowledge.md\`
 
-## 3. Brondocumenten uploaden${uploadedFiles.length ? ` (${uploadedFiles.length} klaar)` : ''}
+URL-lijsten zitten al in seo.md (hoofdpagina's) en knowledge.md (producten + clusters). Sitemap.xml NIET uploaden — agent leest 'm niet runtime.
 
-${uploadedFiles.length
-  ? uploadedFiles.map(f => `- [ ] \`${f.name}\``).join('\n')
+## 3. Brondocumenten uploaden${brandFiles.length ? ` (${brandFiles.length} klaar)` : ''}
+
+${brandFiles.length
+  ? brandFiles.map(f => `- [ ] \`${f.name}\``).join('\n')
   : `- [ ] Merkdocument / brand guidelines
 - [ ] Schrijfwijzer / redactiestijlgids
 - [ ] Tone-of-voice document`}
 
 Optioneel:
-- [ ] Sitemap (\`${sitemap}\`)
 - [ ] Productspecs, whitepapers, onderzoeksrapporten${customTemplateFile ? `\n- [ ] \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` (zit in dit pakket — ook als bijlage uploaden)` : ''}
 
 Slots beschikbaar: ${customTemplateFile ? 5 : 6}.
@@ -2849,7 +2851,6 @@ Beoordeel via rationale-blok onderaan de output.
 function generateSystemPromptMd() {
   const client  = orFallback(val('CLIENT_NAME'), '[KLANT]');
   const maxW    = orFallback(val('MAX_WOORDEN_PER_ZIN'), '20');
-  const sitemap = orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml');
   const maxLinks= orFallback(val('MAX_CLUSTER_LINKS'), '5');
 
   const taal = btnGroupValues['TAAL'] || 'nl-NL';
@@ -2939,12 +2940,18 @@ Technische basis. Brand.md wint bij conflict.
 
 ## Interne linking
 
-- Raadpleeg \`${sitemap}\` vóór schrijven. Ontbreekt → melden, geen links.
+URL-bronnen (al voorgeparseerd, geen sitemap.xml nodig):
+- Hoofdpagina's → \`seo.md\` (sectie: Hoofdpagina's voor interne linking)
+- Productpagina's → \`knowledge.md\` (sectie: Productcatalogus)
+- Site-clusters (indien beschikbaar) → \`knowledge.md\` (sectie: URL-hiërarchie)
+
+Regels:
 - Bovenliggende pagina = URL minus laatste slug. Ankertekst = paginanaam of primair zoekwoord.
 - Max ${maxLinks} clusterlinks per pagina, alleen inhoudelijk passend.
 - Artikel/expertise: ≥1 link naar logische product-/dienstpagina.
 - Ankertekst beschrijvend. Nooit "hier", "klik hier", kale URL.
 - Externe links: alleen officiële bronnen. Nooit concurrenten.
+- URL niet in lijsten? Niet linken — geen URL's verzinnen.
 
 ## Zelfcheck
 
@@ -3052,7 +3059,6 @@ ${stijldocToMd()}
 // ── seo.md ────────────────────────────────────────────────────────────────
 function generateSeoMd() {
   const maxLinks = orFallback(val('MAX_CLUSTER_LINKS'), '5');
-  const sitemap  = orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml');
   const sitemapUrlsRaw = val('SITEMAP_URLS');
   const sitemapUrls = sitemapUrlsRaw
     ? sitemapUrlsRaw.split('\n').map(u => u.trim()).filter(Boolean)
@@ -3115,12 +3121,14 @@ Beschrijvende ankertekst:
 
 ## Interne linking
 
-- Raadpleeg \`${sitemap}\` vóór schrijven. Ontbreekt → melden, geen links.
+URL-bronnen: hoofdpagina's onderaan dit bestand, productpagina's in \`knowledge.md\`. Geen sitemap.xml runtime te lezen.
+
 - Bovenliggende pagina = URL minus laatste slug. Ankertekst = paginanaam of primair zoekwoord.
 - Max ${maxLinks} clusterlinks per pagina, alleen inhoudelijk passend.
 - Artikel/expertise: ≥1 link naar logische product-/dienstpagina.
 - Ankertekst beschrijvend. Nooit "hier", "klik hier", kale URL.
 - Externe links: alleen officiële bronnen. Nooit concurrenten.
+- URL niet in lijsten? Niet linken — geen URL's verzinnen.
 
 ## Alinea + kop
 
