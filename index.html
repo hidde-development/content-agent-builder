@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root {
       --purple:          #6331F4;
@@ -825,6 +826,73 @@
     }
     .extra-knowledge-item .remove:hover { color: #C0392B; }
 
+    /* SEO-strategie sheet — preview */
+    .sheet-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .sheet-stat {
+      background: var(--off-white);
+      border: 1px solid var(--light-grey);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .sheet-stat .num { font-weight: 700; color: var(--purple); font-size: 15px; }
+    .sheet-stat .label { color: var(--dark-grey); }
+    .sheet-stat.warn { border-color: #F5C542; background: #FEF9E7; }
+    .sheet-stat.warn .num { color: #B8860B; }
+    .sheet-stat.error { border-color: #FF453A; background: #FEEEEC; }
+    .sheet-stat.error .num { color: #C0392B; }
+
+    .sheet-section {
+      border: 1px solid var(--light-grey);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      background: var(--white);
+    }
+    .sheet-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--mid-grey);
+      margin-bottom: 8px;
+    }
+    .sheet-section-body { font-size: 13px; color: var(--dark-grey); line-height: 1.5; }
+    .sheet-section-body code { font-family: monospace; font-size: 12px; background: var(--off-white); padding: 1px 5px; border-radius: 3px; }
+
+    .sheet-warn-row {
+      display: flex;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--off-white);
+      font-size: 12.5px;
+    }
+    .sheet-warn-row:last-child { border-bottom: 0; }
+    .sheet-warn-row .icon { flex-shrink: 0; }
+    .sheet-warn-row.ok .icon { color: #34C759; }
+    .sheet-warn-row.warn .icon { color: #B8860B; }
+    .sheet-warn-row.error .icon { color: #C0392B; }
+
+    .sheet-clear-btn {
+      background: none;
+      border: 1px solid var(--light-grey);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--mid-grey);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .sheet-clear-btn:hover { color: #C0392B; border-color: #FF453A; }
+
     .btn-remove {
       width: 28px;
       height: 28px;
@@ -1167,6 +1235,23 @@
     </div>
   </div>
 
+  <!-- SEO-strategie (sitestructuur sheet) -->
+  <div class="section-card">
+    <div class="section-label"><div class="section-square"></div><span>SEO-strategie <span style="font-weight:400;color:var(--mid-grey);font-size:13px">(optioneel)</span></span></div>
+
+    <div class="hint" style="margin-bottom:16px">
+      Heb je een Excel-bestand met de complete site-strategie — toekomstige URL's, keywords per pagina, redirects, paginatemplates, entiteiten? Upload hem hier. De builder leest de structuur en gebruikt 'm om de agent klantspecifieker te maken: per-pagina briefings, klantspecifieke templates en een redirect-bewuste interne linking. Werkt met de Goldfizh blueprint (5 vaste tabbladen: <code>SITESTRUCTUUR</code>, <code>HUIDIGE_PAGINAS</code>, <code>REDIRECTLIST</code>, <code>ENTITEITEN</code> en één tab per template <code>T01_…</code>, <code>T02_…</code>).
+    </div>
+
+    <div id="sheet-upload-zone" class="extra-knowledge-dropzone" onclick="document.getElementById('sheet-input').click()">
+      <input type="file" id="sheet-input" accept=".xlsx,.xls" onchange="handleSheetUpload(this.files[0])" style="display:none" />
+      <span>+ Klik hier of sleep een .xlsx hierheen</span>
+    </div>
+
+    <div id="sheet-status" class="analyse-status" style="margin-top:12px;display:none"></div>
+    <div id="sheet-preview" style="margin-top:16px;display:none"></div>
+  </div>
+
   <!-- Kennisbronnen -->
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>Kennisbronnen</span></div>
@@ -1394,6 +1479,7 @@ window.onerror = function(msg, src, line, col) {
 let uploadedFiles = []; // { name, size, mediaType, data }
 let customTemplateFile = null; // { name, size, data, isPdf }
 let extraKnowledgeFiles = []; // { name, size, isBinary, data } — meegeleverd in ZIP onder knowledge/bronnen/
+let parsedSheet = null; // { fileName, sitestructuur, huidigePaginas, redirects, templates, entiteiten, validation } — geparseerde SEO-strategie sheet
 
 const uploadZone = document.getElementById('upload-zone');
 uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
@@ -1642,6 +1728,399 @@ if (templateUploadZone) {
     handleTemplateFile(e.dataTransfer.files);
   });
 }
+
+// ── SEO-strategie sheet upload ─────────────────────────────────────────────
+async function handleSheetUpload(file) {
+  if (!file) return;
+  const status = document.getElementById('sheet-status');
+  const preview = document.getElementById('sheet-preview');
+
+  status.style.display = 'block';
+  status.className = 'analyse-status';
+  status.textContent = 'Bestand inlezen…';
+  preview.style.display = 'none';
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    parsedSheet = parseSeoStrategySheet(wb, file.name);
+
+    status.className = 'analyse-status success';
+    status.textContent = '✓ Sheet ingelezen: ' + file.name;
+    renderSheetPreview(parsedSheet);
+    preview.style.display = 'block';
+  } catch (err) {
+    parsedSheet = null;
+    status.className = 'analyse-status error';
+    status.textContent = '✗ Kon de sheet niet inlezen: ' + (err && err.message ? err.message : err);
+    preview.style.display = 'none';
+  }
+}
+
+function clearParsedSheet() {
+  parsedSheet = null;
+  document.getElementById('sheet-input').value = '';
+  document.getElementById('sheet-status').style.display = 'none';
+  document.getElementById('sheet-preview').style.display = 'none';
+}
+
+// Tabnaam-normalisatie: spaties/underscores/streepjes egaliseren, hoofdletters
+function normalizeTabName(name) {
+  return String(name || '').trim().replace(/[\s_-]+/g, '_').toUpperCase();
+}
+
+function parseSeoStrategySheet(wb, fileName) {
+  const result = {
+    fileName,
+    sitestructuur: null,
+    huidigePaginas: null,
+    redirects: null,
+    templates: [],
+    entiteiten: null,
+    missingTabs: [],
+    extraTabs: [],
+    validation: { errors: [], warnings: [], info: [] }
+  };
+
+  const knownNames = ['SITESTRUCTUUR', 'HUIDIGE_PAGINAS', 'REDIRECTLIST', 'ENTITEITEN'];
+  const handled = new Set();
+
+  for (const rawName of wb.SheetNames) {
+    const norm = normalizeTabName(rawName);
+    const ws = wb.Sheets[rawName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+
+    if (norm === 'SITESTRUCTUUR') {
+      result.sitestructuur = parseSitestructuur(rows);
+      handled.add('SITESTRUCTUUR');
+    } else if (norm === 'HUIDIGE_PAGINAS' || norm === 'HUIDIGE_PAGINA' || norm === 'HUIDIGE_URLS' || norm === 'HUIDIGE') {
+      result.huidigePaginas = parseHuidigePaginas(rows);
+      handled.add('HUIDIGE_PAGINAS');
+    } else if (norm === 'REDIRECTLIST' || norm === 'REDIRECTS' || norm === 'REDIRECT_LIST') {
+      result.redirects = parseRedirectlist(rows);
+      handled.add('REDIRECTLIST');
+    } else if (norm === 'ENTITEITEN' || norm === 'ENTITIES') {
+      result.entiteiten = parseEntiteiten(rows);
+      handled.add('ENTITEITEN');
+    } else if (/^T\d+/.test(norm)) {
+      const tpl = parseTemplate(rows, rawName);
+      if (tpl) result.templates.push(tpl);
+    } else {
+      result.extraTabs.push(rawName);
+    }
+  }
+
+  for (const k of knownNames) {
+    if (!handled.has(k)) result.missingTabs.push(k);
+  }
+
+  runSheetValidations(result);
+  return result;
+}
+
+// SITESTRUCTUUR — multi-row header; vind de rij met "Toekomstige link"
+function parseSitestructuur(rows) {
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    if (rows[i].some(c => /toekomstige\s*link/i.test(String(c)))) { headerIdx = i; break; }
+  }
+  if (headerIdx === -1) {
+    return { headerIdx: -1, pages: [], totalRows: rows.length, error: 'Kolom "Toekomstige link" niet gevonden' };
+  }
+
+  const headers = rows[headerIdx].map(c => String(c).trim());
+  const findCol = (regex) => headers.findIndex(h => regex.test(h));
+  const cols = {
+    levels: [findCol(/^level\s*0$/i), findCol(/^level\s*1$/i), findCol(/^level\s*2$/i), findCol(/^level\s*3$/i), findCol(/^level\s*4$/i)],
+    alinea: findCol(/alinea|contentblok/i),
+    keyword: findCol(/non[- ]?branded|keyword|zoekwoord/i),
+    volume: findCol(/^volume$/i),
+    positie: findCol(/positie/i),
+    opmerking: findCol(/opmerking/i),
+    redirect: findCol(/^redirect/i),
+    toekomstig: findCol(/toekomstige\s*link/i),
+    huidigeLinks: headers.map((h, i) => /huidige\s*link/i.test(h) ? i : -1).filter(i => i >= 0),
+    cta: findCol(/^cta$/i),
+    metaTitle: findCol(/meta\s*title/i),
+    template: findCol(/^template$/i)
+  };
+
+  const pages = [];
+  let currentPage = null;
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.every(c => String(c).trim() === '')) continue;
+
+    const toekomstig = String(row[cols.toekomstig] || '').trim();
+    const keyword = cols.keyword >= 0 ? String(row[cols.keyword] || '').trim() : '';
+
+    if (toekomstig) {
+      currentPage = {
+        url: toekomstig,
+        breadcrumb: cols.levels.map(idx => idx >= 0 ? String(row[idx] || '').trim() : '').filter(Boolean),
+        opmerking: cols.opmerking >= 0 ? String(row[cols.opmerking] || '').trim() : '',
+        template: cols.template >= 0 ? String(row[cols.template] || '').trim() : '',
+        cta: cols.cta >= 0 ? String(row[cols.cta] || '').trim() : '',
+        metaTitle: cols.metaTitle >= 0 ? String(row[cols.metaTitle] || '').trim() : '',
+        huidigeLinks: cols.huidigeLinks.map(idx => String(row[idx] || '').trim()).filter(Boolean),
+        keywords: []
+      };
+      if (keyword && !/^(totaal|nvt)$/i.test(keyword)) {
+        currentPage.keywords.push({ term: keyword, volume: parseSheetNum(row[cols.volume]), positie: parseSheetNum(row[cols.positie]) });
+      }
+      pages.push(currentPage);
+    } else if (currentPage && keyword && !/^(totaal|nvt)$/i.test(keyword)) {
+      currentPage.keywords.push({ term: keyword, volume: parseSheetNum(row[cols.volume]), positie: parseSheetNum(row[cols.positie]) });
+      for (const idx of cols.huidigeLinks) {
+        const v = String(row[idx] || '').trim();
+        if (v && !currentPage.huidigeLinks.includes(v)) currentPage.huidigeLinks.push(v);
+      }
+    } else if (currentPage) {
+      for (const idx of cols.huidigeLinks) {
+        const v = String(row[idx] || '').trim();
+        if (v && !currentPage.huidigeLinks.includes(v)) currentPage.huidigeLinks.push(v);
+      }
+    }
+  }
+
+  return { headerIdx, headers, pages, totalRows: rows.length, columnsFound: cols };
+}
+
+function parseSheetNum(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+// HUIDIGE_PAGINAS — kolom A, simpele lijst met optionele header
+function parseHuidigePaginas(rows) {
+  const urls = [];
+  for (const row of rows) {
+    const v = String(row[0] || '').trim();
+    if (!v || /^address$/i.test(v) || /^url$/i.test(v)) continue;
+    if (/^https?:\/\//i.test(v)) urls.push(v);
+  }
+  return { urls };
+}
+
+// REDIRECTLIST — driedelig controlemechanisme (recompute, niet vertrouwen op cache)
+function parseRedirectlist(rows) {
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    if (rows[i].some(c => /oude\s*links?/i.test(String(c))) &&
+        rows[i].some(c => /toekomstige\s*link/i.test(String(c)))) { headerIdx = i; break; }
+  }
+  if (headerIdx === -1) return { entries: [], duplicates: [], selfRefs: [], emptyOld: [], totalEntries: 0, error: 'Kolommen niet herkend' };
+
+  const headers = rows[headerIdx].map(c => String(c).trim());
+  const oudCol = headers.findIndex(h => /oude\s*links?/i.test(h));
+  const newCol = headers.findIndex(h => /toekomstige\s*link/i.test(h));
+
+  const entries = [];
+  const oldUrlCounts = new Map();
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const oud = String(rows[i][oudCol] || '').trim();
+    const nieuw = String(rows[i][newCol] || '').trim();
+    if (!oud && !nieuw) continue;
+    entries.push({ oud, nieuw });
+    if (oud) oldUrlCounts.set(oud, (oldUrlCounts.get(oud) || 0) + 1);
+  }
+
+  const duplicates = [...oldUrlCounts.entries()].filter(([_, c]) => c > 1).map(([url, count]) => ({ url, count }));
+  const selfRefs = entries.filter(e => e.oud && e.nieuw && normalizeUrlForCompare(e.oud) === normalizeUrlForCompare(e.nieuw));
+  const emptyOld = entries.filter(e => !e.oud && e.nieuw);
+
+  return { entries, duplicates, selfRefs, emptyOld, totalEntries: entries.length };
+}
+
+function normalizeUrlForCompare(u) {
+  return String(u).trim().toLowerCase().replace(/\/+$/, '');
+}
+
+// ENTITEITEN — kolom A, één term per rij (header optioneel)
+function parseEntiteiten(rows) {
+  const terms = [];
+  for (let i = 0; i < rows.length; i++) {
+    const v = String(rows[i][0] || '').trim();
+    if (!v) continue;
+    if (terms.length === 0 && /^(entiteit|term|woord)/i.test(v)) continue;
+    terms.push(v);
+  }
+  return { terms };
+}
+
+// TEMPLATE-tab — metadata-blok + sectietabel
+function parseTemplate(rows, tabName) {
+  if (!rows.length) return null;
+  const firstCell = String(rows[0][0] || '').trim().toUpperCase().replace(/:$/, '');
+  let code = '', naam = '', gebruik = '', doel = '', intentie = '';
+  let metaEnd = 0;
+
+  if (firstCell === 'TEMPLATE') {
+    code = String(rows[0][1] || '').trim();
+    for (let i = 0; i < Math.min(rows.length, 12); i++) {
+      const rawKey = String(rows[i][0] || '').trim();
+      const key = rawKey.toLowerCase().replace(/:$/, '');
+      const val = String(rows[i][1] || '').trim();
+      // Stop bij lege rij of bij de tabel-headerrij
+      if (!rawKey && !val) { metaEnd = i + 1; break; }
+      if (/^(nr|sectie|wat)$/i.test(rawKey)) { metaEnd = i; break; }
+      if (key === 'naam') naam = val;
+      else if (/^gebruik(\s+wanneer)?$/.test(key)) gebruik = val;
+      else if (key === 'doel') doel = val;
+      else if (/^(zoek)?intentie$/.test(key)) intentie = val;
+      metaEnd = i + 1;
+    }
+  } else {
+    // Fallback: leid code af van tabnaam (T01_..., T01-..., T01 ...)
+    const m = tabName.match(/^T(\d+)[\s_\-]*(.*)$/i);
+    if (!m) return null;
+    code = 'T' + String(m[1]).padStart(2, '0');
+    naam = m[2].trim().replace(/_/g, ' ');
+  }
+
+  // Vind tabel-headerrij
+  let tableHeaderIdx = -1;
+  for (let i = metaEnd; i < Math.min(rows.length, 14); i++) {
+    if (rows[i].some(c => /^(nr|sectie|wat)$/i.test(String(c).trim()))) { tableHeaderIdx = i; break; }
+  }
+
+  const sections = [];
+  if (tableHeaderIdx >= 0) {
+    const hdr = rows[tableHeaderIdx].map(c => String(c).trim());
+    const cNr = hdr.findIndex(h => /^nr$/i.test(h));
+    const cSec = hdr.findIndex(h => /^(sectie|wat)$/i.test(h));
+    const cVb = hdr.findIndex(h => /voorbeeld/i.test(h));
+    const cInst = hdr.findIndex(h => /^(instructie|waarom)$/i.test(h));
+    const cEnt = hdr.findIndex(h => /entiteit/i.test(h));
+    const cCta = hdr.findIndex(h => /^(cta|link)/i.test(h));
+
+    for (let i = tableHeaderIdx + 1; i < rows.length; i++) {
+      const r = rows[i];
+      const sec = cSec >= 0 ? String(r[cSec] || '').trim() : '';
+      const vb = cVb >= 0 ? String(r[cVb] || '').trim() : '';
+      const inst = cInst >= 0 ? String(r[cInst] || '').trim() : '';
+      if (!sec && !vb && !inst) continue;
+      sections.push({
+        nr: cNr >= 0 ? String(r[cNr] || '').trim() : String(sections.length + 1),
+        sectie: sec,
+        voorbeeld: vb,
+        instructie: inst,
+        entiteiten: cEnt >= 0 ? String(r[cEnt] || '').trim() : '',
+        cta: cCta >= 0 ? String(r[cCta] || '').trim() : ''
+      });
+    }
+  }
+
+  return { code, naam, gebruik, doel, intentie, sections, tabName };
+}
+
+function runSheetValidations(p) {
+  const v = p.validation;
+
+  if (p.missingTabs.length) {
+    v.warnings.push('Tabbladen niet gevonden: ' + p.missingTabs.join(', ') + '. De builder gebruikt alleen wat aanwezig is.');
+  }
+
+  if (p.sitestructuur && !p.sitestructuur.error) {
+    const pages = p.sitestructuur.pages;
+    const withTpl = pages.filter(pg => pg.template).length;
+    v.info.push('Sitestructuur: ' + pages.length + " toekomstige pagina's (" + withTpl + ' met template, ' + (pages.length - withTpl) + ' zonder)');
+
+    const tplCodes = new Set(p.templates.map(t => t.code.toUpperCase()));
+    const refsButMissing = new Set();
+    for (const pg of pages) {
+      const t = pg.template ? pg.template.toUpperCase() : '';
+      if (t && !tplCodes.has(t)) refsButMissing.add(pg.template);
+    }
+    if (refsButMissing.size) {
+      v.errors.push('Sitestructuur verwijst naar onbekende templates: ' + [...refsButMissing].join(', ') + '. Voeg de bijbehorende T-tabbladen toe of corrigeer de codes.');
+    }
+  } else if (p.sitestructuur && p.sitestructuur.error) {
+    v.errors.push('SITESTRUCTUUR: ' + p.sitestructuur.error);
+  }
+
+  if (p.redirects && !p.redirects.error) {
+    if (p.redirects.duplicates.length) v.errors.push(p.redirects.duplicates.length + ' dubbele oude URL\'s in REDIRECTLIST (één URL kan maar naar één plek redirecten).');
+    if (p.redirects.selfRefs.length) v.errors.push(p.redirects.selfRefs.length + ' zelf-redirects (URL verwijst naar zichzelf).');
+    if (p.redirects.emptyOld.length) v.info.push(p.redirects.emptyOld.length + " nieuwe pagina's zonder voorganger (lege \"Oude link\" — verwacht voor nieuwe content).");
+  } else if (p.redirects && p.redirects.error) {
+    v.errors.push('REDIRECTLIST: ' + p.redirects.error);
+  }
+
+  if (p.entiteiten) v.info.push('Entiteiten: ' + p.entiteiten.terms.length + ' termen');
+  if (p.templates.length) v.info.push('Templates herkend: ' + p.templates.map(t => t.code).join(', '));
+}
+
+function renderSheetPreview(p) {
+  const wrap = document.getElementById('sheet-preview');
+  const stats = [];
+
+  if (p.sitestructuur && !p.sitestructuur.error) {
+    stats.push({ num: p.sitestructuur.pages.length, label: "toekomstige URL's" });
+    const totalKw = p.sitestructuur.pages.reduce((acc, pg) => acc + pg.keywords.length, 0);
+    if (totalKw) stats.push({ num: totalKw, label: 'keywords gekoppeld' });
+  }
+  if (p.templates.length) stats.push({ num: p.templates.length, label: 'templates' });
+  if (p.entiteiten) stats.push({ num: p.entiteiten.terms.length, label: 'entiteiten' });
+  if (p.huidigePaginas) stats.push({ num: p.huidigePaginas.urls.length, label: "huidige URL's" });
+  if (p.redirects && !p.redirects.error) stats.push({ num: p.redirects.totalEntries, label: 'redirects' });
+
+  const errCount = p.validation.errors.length;
+  const warnCount = p.validation.warnings.length;
+
+  let html = '<div class="sheet-stats">';
+  for (const s of stats) {
+    html += '<div class="sheet-stat"><span class="num">' + s.num + '</span><span class="label">' + escapeHtml(s.label) + '</span></div>';
+  }
+  if (errCount) html += '<div class="sheet-stat error"><span class="num">' + errCount + '</span><span class="label">fouten</span></div>';
+  if (warnCount) html += '<div class="sheet-stat warn"><span class="num">' + warnCount + '</span><span class="label">waarschuwingen</span></div>';
+  html += '</div>';
+
+  if (errCount || warnCount || p.validation.info.length) {
+    html += '<div class="sheet-section"><div class="sheet-section-title">Validatie</div><div class="sheet-section-body">';
+    for (const e of p.validation.errors) html += '<div class="sheet-warn-row error"><span class="icon">✗</span><span>' + escapeHtml(e) + '</span></div>';
+    for (const w of p.validation.warnings) html += '<div class="sheet-warn-row warn"><span class="icon">!</span><span>' + escapeHtml(w) + '</span></div>';
+    for (const i of p.validation.info) html += '<div class="sheet-warn-row ok"><span class="icon">✓</span><span>' + escapeHtml(i) + '</span></div>';
+    html += '</div></div>';
+  }
+
+  if (p.templates.length) {
+    html += '<div class="sheet-section"><div class="sheet-section-title">Templates</div><div class="sheet-section-body">';
+    for (const t of p.templates) {
+      html += '<div style="margin-bottom:8px"><code>' + escapeHtml(t.code) + '</code> · <strong>' + escapeHtml(t.naam || '(geen naam)') + '</strong> — ' + t.sections.length + ' secties';
+      if (t.gebruik) html += '<div style="font-size:12px;color:var(--mid-grey);margin-top:2px">' + escapeHtml(t.gebruik) + '</div>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  html += '<div style="margin-top:12px"><button type="button" class="sheet-clear-btn" onclick="clearParsedSheet()">Sheet verwijderen</button></div>';
+
+  wrap.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+(function initSheetDropzone() {
+  const zone = document.getElementById('sheet-upload-zone');
+  if (!zone) return;
+  ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.add('drag');
+  }));
+  ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.remove('drag');
+  }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      handleSheetUpload(e.dataTransfer.files[0]);
+    }
+  });
+})();
 
 // ── Analyse & auto-fill ───────────────────────────────────────────────────
 async function analyseFiles() {
