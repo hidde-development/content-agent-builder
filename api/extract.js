@@ -86,8 +86,12 @@ module.exports = async function handler(req, res) {
 
   // Build message content for Claude
   const content = [];
+  const MAX_TEXT_PER_FILE = 80000; // ~20K tokens — voorkomt Vercel 60s-timeout op grote MD/TXT
 
   for (const file of files) {
+    // Skip XML/sitemaps server-side als ze toch zijn doorgekomen — dragen niet bij aan brand-extractie
+    if (file.name && file.name.toLowerCase().endsWith('.xml')) continue;
+
     if (file.mediaType === 'application/pdf') {
       content.push({
         type: 'document',
@@ -99,10 +103,15 @@ module.exports = async function handler(req, res) {
         title: file.name,
       });
     } else {
-      // Plain text or markdown
+      let text = String(file.data || '');
+      let truncatedNote = '';
+      if (text.length > MAX_TEXT_PER_FILE) {
+        text = text.slice(0, MAX_TEXT_PER_FILE);
+        truncatedNote = `\n\n[…afgekapt op ${MAX_TEXT_PER_FILE} tekens — origineel was ${file.data.length}]`;
+      }
       content.push({
         type: 'text',
-        text: `--- Bestand: ${file.name} ---\n${file.data}`,
+        text: `--- Bestand: ${file.name} ---\n${text}${truncatedNote}`,
       });
     }
   }

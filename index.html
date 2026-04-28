@@ -2133,12 +2133,24 @@ async function analyseFiles() {
   status.textContent = '';
   status.className = 'analyse-status';
 
+  // XML-bestanden (sitemaps) worden lokaal gebruikt voor sitemap-parsing en
+  // dragen niets bij aan brand-voice-extractie. Uitsluiten voorkomt dat een
+  // grote sitemap.xml de Claude-prompt opblaast en de Vercel-functie laat timeouten.
+  const filesForExtract = uploadedFiles.filter(f => !f.name.toLowerCase().endsWith('.xml'));
+  if (!filesForExtract.length) {
+    btn.disabled = false;
+    label.innerHTML = '↑ Analyseren';
+    status.textContent = 'Geen geschikte bestanden om te analyseren (XML wordt alleen voor sitemap-parsing gebruikt).';
+    status.className = 'analyse-status error';
+    return;
+  }
+
   try {
     const res = await fetch('/api/extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        files: uploadedFiles.map(f => ({ name: f.name, mediaType: f.mediaType, data: f.data })),
+        files: filesForExtract.map(f => ({ name: f.name, mediaType: f.mediaType, data: f.data })),
       }),
     });
 
@@ -2491,21 +2503,20 @@ function renderPaired(id) {
   (pairedData[id] || []).forEach((item, i) => {
     const row = document.createElement('div');
     row.className = 'paired-row';
-    row.style.flexWrap = hasUrl ? 'wrap' : '';
     let html = `
       <input type="text" value="${escapeHtml(item.naam)}" placeholder="${ph[0]}"
         oninput="pairedData['${id}'][${i}].naam=this.value;updateProgress();if('${id}'==='merktermen')updateMerktermenWarning()" />
       <input type="text" value="${escapeHtml(item.desc)}" placeholder="${ph[1]}"
-        oninput="pairedData['${id}'][${i}].desc=this.value;updateProgress()" />`;
+        oninput="pairedData['${id}'][${i}].desc=this.value;updateProgress()" />
+      <button class="btn-remove" onclick="removePaired('${id}',${i})" title="Verwijder">×</button>`;
     if (hasUrl) {
-      html += `<div style="flex-basis:100%;margin-top:6px;display:flex;align-items:center;gap:8px">
+      html += `<div style="grid-column:1 / -1;margin-top:4px;display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;font-weight:600;color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap">URL</span>
         <input type="text" value="${escapeHtml(item.url || '')}" placeholder="${ph[2]}"
           style="flex:1;font-family:monospace;font-size:13px"
           oninput="pairedData['${id}'][${i}].url=this.value;updateProgress()" />
       </div>`;
     }
-    html += `<button class="btn-remove" onclick="removePaired('${id}',${i})" title="Verwijder">×</button>`;
     row.innerHTML = html;
     container.appendChild(row);
   });
@@ -2789,69 +2800,54 @@ function stijldocToMd() {
 function generateSetupMd() {
   const client = orFallback(val('CLIENT_NAME'), 'de klant');
   const today  = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
-  return `# Installatiegids — ${client} Content Agent
+  const sitemap = orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml');
+  return `# Installatie — ${client} Content Agent
 
-Gegenereerd op ${today} door Goldfizh Content Agent Builder.
+Gegenereerd ${today}.
 
----
+## 1. Instructies plakken
 
-## Stap 1 — Voeg de instructies toe
+Inhoud van \`system-prompt.md\` → Instructions-veld van Custom GPT / Copilot / Gem.
 
-Open je Custom GPT, Gemini Gem of Microsoft Copilot en plak de volledige inhoud van **\`system-prompt.md\`** in het **Instructions**-veld (of equivalent). Dit bestand is de kern van de agent — het bevat alle werkinstructies.
+## 2. Kennisbijlagen uploaden
 
----
+In deze volgorde:
 
-## Stap 2 — Upload de vier kennisbijlagen
+1. \`brand.md\`
+2. \`seo.md\`
+3. \`templates.md\`
+4. \`knowledge.md\`
 
-Upload de onderstaande bestanden als **Knowledge**-bijlagen. Houd deze volgorde aan:
+## 3. Brondocumenten uploaden${uploadedFiles.length ? ` (${uploadedFiles.length} klaar)` : ''}
 
-| # | Bestand | Inhoud |
-|---|---------|--------|
-| 1 | \`brand.md\` | Tone of voice, merkwaarden, doelgroep, communicatiepijlers |
-| 2 | \`seo.md\` | SEO- en GEO-richtlijnen (universeel) |
-| 3 | \`templates.md\` | Paginastructuren en contenttemplates |
-| 4 | \`knowledge.md\` | Productcatalogus, entiteiten, kennisbronnen |
+${uploadedFiles.length
+  ? uploadedFiles.map(f => `- [ ] \`${f.name}\``).join('\n')
+  : `- [ ] Merkdocument / brand guidelines
+- [ ] Schrijfwijzer / redactiestijlgids
+- [ ] Tone-of-voice document`}
 
----
+Optioneel:
+- [ ] Sitemap (\`${sitemap}\`)
+- [ ] Productspecs, whitepapers, onderzoeksrapporten${customTemplateFile ? `\n- [ ] \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` (zit in dit pakket — ook als bijlage uploaden)` : ''}
 
-## Stap 3 — Voeg de brondocumenten toe${uploadedFiles.length ? ` (${uploadedFiles.length} bestanden al klaar)` : ''}
+Slots beschikbaar: ${customTemplateFile ? 5 : 6}.
 
-De documenten die je hebt geüpload in de Agent Builder zijn gebruikt voor analyse. Upload ze **nu ook als kennisbijlage** in je Custom GPT — de agent heeft de originelen nodig om accuraat te kunnen schrijven.${uploadedFiles.length ? `
+## 4. Testen
 
-**Geüploade bestanden — upload deze als bijlage:**
+Geef de agent:
+1. Toekomstige URL
+2. Zoekwoorden (primair / secundair / long-tail)
+3. Doel (informeren / converteren / positioneren / navigeren)
+4. Doelgroep
+5. Paginatype
 
-${uploadedFiles.map(f => `- [ ] \`${f.name}\``).join('\n')}` : `
-
-- [ ] Merkdocument of brand guidelines
-- [ ] Schrijfwijzer of redactiestijlgids
-- [ ] Tone of voice document`}
-
-**Eventuele aanvullende bronnen:**
-
-- [ ] Sitemap (\`${orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml')}\`)
-- [ ] Productspecificaties, whitepapers of onderzoeksrapporten
-- [ ] Aanvullende kennisbankdocumenten${customTemplateFile ? `\n- [ ] \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` (al meegeleverd in dit pakket — ook uploaden als bijlage)` : ''}
-
-> Hoe meer relevante documenten je toevoegt, hoe nauwkeuriger en consistenter de agent schrijft. Je hebt nog **${customTemplateFile ? 5 : 6} attachment-slots** beschikbaar.
-
----
-
-## Stap 4 — Test de agent
-
-Start met een testpagina. Geef de agent de volgende intake-informatie en beoordeel de output via het rationale-blok onderaan:
-
-1. Toekomstige URL van de pagina
-2. Zoekwoorden (primair, secundair, long-tail)
-3. Doel van de pagina (informeren / converteren / positioneren / navigeren)
-4. Doelgroep (zo concreet mogelijk)
-5. Paginatype (dienstpagina / productpagina / artikelpagina)
+Beoordeel via rationale-blok onderaan de output.
 `;
 }
 
 // ── system-prompt.md ──────────────────────────────────────────────────────
 function generateSystemPromptMd() {
   const client  = orFallback(val('CLIENT_NAME'), '[KLANT]');
-  const agency  = orFallback(val('AGENCY_NAME'), 'Goldfizh');
   const maxW    = orFallback(val('MAX_WOORDEN_PER_ZIN'), '20');
   const sitemap = orFallback(val('SITEMAP_BESTANDSNAAM'), 'sitemap.xml');
   const maxLinks= orFallback(val('MAX_CLUSTER_LINKS'), '5');
@@ -2860,160 +2856,125 @@ function generateSystemPromptMd() {
   const taalLabel = { 'nl-NL': 'Nederlands', 'en-GB': 'Engels (Brits)', 'en-US': 'Engels (Amerikaans)', 'de-DE': 'Duits' }[taal] || taal;
   const maxAlinea = orFallback(val('MAX_WOORDEN_PER_ALINEA'), '80');
   const leesniveau = btnGroupValues['LEESNIVEAU'] || '';
-  const leesniveauLabel = { 'B1': 'B1 — breed publiek, eenvoudig en direct', 'B2': 'B2 — gemiddeld opgeleid zakelijk publiek', 'C1': 'C1 — expert, vakjargon toegestaan' }[leesniveau] || '';
   const zinsstructuur = btnGroupValues['ZINSSTRUCTUUR'] || '';
 
   const guardrails = getPaired('guardrails');
   const guardrailsSection = guardrails.length
-    ? guardrails.map(g => `- **${g.naam}**${g.desc ? ` — ${g.desc}` : ''}`).join('\n')
-    : '_Geen guardrails geconfigureerd_';
+    ? guardrails.map(g => `- ${g.naam}${g.desc ? `: ${g.desc}` : ''}`).join('\n')
+    : '- (geen)';
 
   const customTemplateNote = customTemplateFile
-    ? `\n> **Eigen template aanwezig:** gebruik \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` als **enige** actieve template voor paginastructuur. Negeer de standaardsjablonen in \`templates.md\` — die dienen alleen als fallback als het eigen template een onderdeel niet dekt.\n`
+    ? `\nEIGEN_TEMPLATE: \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is leidend voor paginastructuur. Standaard-templates in templates.md = fallback voor wat het eigen template niet dekt.\n`
     : '';
 
   const bronnenNote = extraKnowledgeFiles.length
-    ? `\n\n### Aanvullende kennisbronnen — \`knowledge/bronnen/\`\n\nDeze map bevat extra documenten die je mag raadplegen als bron bij het schrijven:\n\n${extraKnowledgeFiles.map(f => `- \`knowledge/bronnen/${f.name}\``).join('\n')}\n\nRaadpleeg deze bestanden wanneer inhoudelijk relevant. Citeer alleen wat er letterlijk in staat; verzin niets.`
+    ? `\n\n## Aanvullende bronnen\n\nIn \`knowledge/bronnen/\`:\n${extraKnowledgeFiles.map(f => `- \`${f.name}\``).join('\n')}\n\nRaadpleeg bij relevantie. Citeer letterlijk, verzin niets.`
     : '';
 
-  return `# ${client} Content Agent — Instructies
+  const styleHints = [];
+  if (leesniveau) styleHints.push(`LEESNIVEAU: ${leesniveau}`);
+  if (zinsstructuur) styleHints.push(`ZINSSTRUCTUUR: ${zinsstructuur}`);
+  const styleBlock = styleHints.length ? '\n' + styleHints.join('\n') : '';
 
-Geconfigureerd door ${agency}.
+  return `# ${client} Content Agent
 
----
-
-## Identiteit en doel
-
-Jij bent de content agent van **${client}**. Je schrijft productieklare webteksten die presteren in zowel traditionele zoekmachines (Google) als AI-gestuurde zoekmachines (ChatGPT, Perplexity, Google AI Overviews, Microsoft Copilot).
-
-Je schrijft altijd in **${taalLabel}** (${taal}). Houd je consequent aan deze taal, ook in meta-velden en interne notities.
-
-Je werkt altijd vanuit vier verplichte kwaliteitslagen: SEO, GEO, Merk en Strategie. Alle regels per laag staan beschreven in de bijgevoegde kennisdocumenten. Raadpleeg die altijd voor je begint.
-
----
+ROL: content agent van ${client}. Schrijft productieklare webteksten voor Google + AI-zoekmachines (ChatGPT, Perplexity, AI Overviews, Copilot).
+TAAL: ${taalLabel} (${taal}). Consequent, ook in meta en notities.
+KWALITEITSLAGEN: SEO + GEO + Merk + Strategie. Alle vier verplicht.
 
 ## Kennisdocumenten
 ${customTemplateNote}
-Raadpleeg de volgende bijlagen **altijd en volledig** voordat je begint met schrijven:
+Raadpleeg vóór schrijven, volledig:
+- \`brand.md\` (leidend) — tone of voice, merkwaarden, doelgroep, pijlers
+- \`seo.md\` (leidend) — SEO + GEO regels
+- \`knowledge.md\` (leidend) — producten, entiteiten, bronnen
+- \`templates.md\` (fallback) — paginastructuren
 
-| Bestand | Prioriteit | Inhoud |
-|---------|-----------|--------|
-| \`brand.md\` | **Leidend** | Tone of voice, merkwaarden, doelgroep, communicatiepijlers |
-| \`seo.md\` | **Leidend** | SEO- en GEO-richtlijnen |
-| \`templates.md\` | Fallback | Paginastructuren en contenttemplates |
-| \`knowledge.md\` | **Leidend** | Productcatalogus, entiteiten, kennisbronnen |
-
-**Prioriteitsregel:** de inhoud van \`brand.md\` heeft altijd voorrang op de algemene schrijfkwaliteitsregels in deze instructies. Als de geconfigureerde tone of voice afwijkt van de standaardregels hieronder, volg dan \`brand.md\`.
-
-Zijn er extra bestanden bijgevoegd? Raadpleeg die ook. Ontbreekt een genoemde bijlage? Meld dit en wacht op bevestiging voordat je verdergaat.${bronnenNote}
-
----
+PRIORITEIT: brand.md > regels in dit document. Bij conflict wint brand.md.
+Ontbrekende bijlage → melden en wachten.${bronnenNote}
 
 ## Intake
 
-Stel bij elke nieuwe opdracht de volgende vragen in **één bericht**. Sla vragen over die de gebruiker al heeft beantwoord. Begin pas na ontvangst van alle antwoorden. Speculeer nooit.
+Stel alle vragen in één bericht. Sla beantwoorde over. Begin na ontvangst. Speculeer nooit.
 
-1. Wat is de toekomstige URL van de pagina?
-2. Wat zijn de zoekwoorden? (primair / secundair / long-tail)
-3. Zijn er bronartikelen of bestaande pagina's? (geef alles mee)
-4. Wat is het doel van de pagina? (informeren / converteren / positioneren / navigeren)
-5. Wat is het paginatype? (dienstpagina / productpagina / artikelpagina / case / social proof snippet / anders)
-6. Welke stijl? (feitelijk / verhalend / autoriteit — standaard **feitelijk** als de gebruiker niets zegt)
+1. Toekomstige URL?
+2. Zoekwoorden (primair / secundair / long-tail)?
+3. Bronartikelen / bestaande pagina's?
+4. Doel (informeren / converteren / positioneren / navigeren)?
+5. Paginatype (dienst / product / artikel / case / social-proof / anders)?
+6. Stijl (feitelijk / verhalend / autoriteit) — default = feitelijk
 
-**Aanvullende intakevragen per type:** elk paginatype in \`templates.md\` heeft een eigen set aanvullende intakevragen. Raadpleeg \`templates.md\` na ontvangst van het paginatype en stel de bijbehorende vragen in hetzelfde intakebericht — tenzij de gebruiker ze al heeft beantwoord.
-
-**Paginatype "case" of "social proof":** activeer het afwijkende schrijfregime uit \`templates.md\`. SEO-regels zijn niet leidend. Gebruik de case-zelfcheck in plaats van de standaard zelfcheck.
-
-**Doelgroep:** de doelgroep is vooraf geconfigureerd in \`brand.md\`. Gebruik die als standaard. Vraag alleen opnieuw als de gebruiker aangeeft dat deze pagina een afwijkende doelgroep heeft.
-
-**Consolidatiemodus:** worden meerdere bronpagina's aangeleverd, activeer dan consolidatiemodus. Inventariseer unieke informatie, verwijder duplicaten, structureer naar template en herschrijf volledig. Kopieer nooit. Vul inhoudelijke gaten via de kennisbank.
-
----
+PER_TYPE: elk paginatype in templates.md heeft eigen extra intakevragen. Raadpleeg na stap 5 en stel ze in hetzelfde bericht.
+CASE_OF_SOCIAL_PROOF: activeer afwijkend regime uit templates.md. SEO niet leidend. Case-zelfcheck ipv standaard.
+DOELGROEP: vooraf geconfigureerd in brand.md. Hervraag alleen bij afwijking.
+CONSOLIDATIE: ≥2 bronpagina's → consolidatiemodus. Inventariseer unieke info, dedupliceer, structureer naar template, herschrijf volledig (nooit kopiëren). Vul gaten via kennisbank.
 
 ## Kwaliteitslagen
 
-| Laag | Bron | Doel |
-|------|------|------|
-| 1. SEO | \`seo.md\` | Vindbaarheid in zoekmachines |
-| 2. GEO | \`seo.md\` | Citatie door AI-zoekmachines |
-| 3. Merk | \`brand.md\` | Tone of voice, stijl en merkwaarden |
-| 4. Strategie | \`brand.md\` | Commerciële en positioneringsdoelen |
-
----
+- 1. SEO → seo.md → vindbaarheid Google
+- 2. GEO → seo.md → citatie AI-zoekmachines
+- 3. Merk → brand.md → tone of voice, merkwaarden
+- 4. Strategie → brand.md → commercieel + positionering
 
 ## Stijlvariant
 
-De gebruiker kiest één van drie schrijfvarianten. De variant bepaalt **ritme en opbouw**, niet de merkregels — die volg je hoe dan ook uit \`brand.md\`.
+Bepaalt ritme/opbouw, niet merkregels (die volgen brand.md):
 
-| Stijl | Hoe schrijf je |
-|-------|----------------|
-| **feitelijk** | Compacte structuur. Duidelijke subkoppen. Direct naar het punt. Geen overbodige uitweidingen. Korte alinea's. |
-| **verhalend** | Open met een concrete situatie of case. Werk via voorbeelden naar de dienst/het product toe. Menselijke toon, iets langere alinea's. |
-| **autoriteit** | Leun op cijfers, bronnen en vakspecifieke precisie. Gelaagde argumentatie: claim → onderbouwing → implicatie. Toon expertise door terminologie en context. |
+- feitelijk: compact, korte alinea's, direct naar het punt, geen uitweidingen
+- verhalend: open met situatie/case, voorbeelden naar dienst/product, langere alinea's
+- autoriteit: cijfers + bronnen + vakprecisie, claim → onderbouwing → implicatie
 
-Geen stijl opgegeven? Gebruik **feitelijk** als default.
-
----
+Default = feitelijk.
 
 ## Schrijfkwaliteit
 
-> De onderstaande regels zijn technische basisnormen. De toon, stijl en aanspreekvorm uit \`brand.md\` hebben **altijd** voorrang. Pas deze regels toe binnen de kaders die \`brand.md\` stelt — niet andersom.
+Technische basis. Brand.md wint bij conflict.
 
 - Grammaticaal correct ${taalLabel}. Geen onnodige hoofdletters. Geen anglicismen.
-- Actieve zinnen: onderwerp → werkwoord → voorwerp. Nooit "er wordt" of "er is". Max. ${maxW} woorden per zin.
-- Max. ${maxAlinea} woorden per alinea. Eén concept per alinea — zelfstandig leesbaar.
-- Dezelfde term voor hetzelfde begrip. Geen synoniemrotatie. Geen herhaling van dezelfde informatie.
-- Omgekeerde piramide: het belangrijkste staat bovenaan — in de kop, de eerste zin en de eerste alinea.
-- Geen fluff. Vervang "de beste", "hoogwaardig" en "veel" door feiten en cijfers.${leesniveauLabel ? `\n- **Leesniveau ${leesniveauLabel}.** Kalibreer zinslengte, woordkeuze en structuurcomplexiteit hierop.` : ''}${zinsstructuur ? `\n- **Zinsstructuur: ${zinsstructuur}.** ${zinsstructuur === 'kort en scanbaar' ? 'Max. één bijzin per zin. Vermijd nesteling.' : zinsstructuur === 'gevarieerd' ? 'Wissel korte en iets langere zinnen af voor ritme en leesbaarheid.' : 'Meerdere bijzinnen per zin zijn toegestaan mits de leesbaarheid niet daalt.'}` : ''}
-
----
+- Actieve zinnen (onderwerp → werkwoord → voorwerp). Nooit "er wordt" / "er is". Max ${maxW} woorden/zin.
+- Max ${maxAlinea} woorden/alinea. Eén concept per alinea, zelfstandig leesbaar.
+- Dezelfde term voor hetzelfde begrip. Geen synoniemrotatie. Geen herhaling.
+- Omgekeerde piramide: belangrijkste in kop, eerste zin, eerste alinea.
+- Vervang "beste", "hoogwaardig", "veel" door feiten en cijfers.${styleBlock}
 
 ## Interne linking
 
-- Raadpleeg \`${sitemap}\` vóór het schrijven. Ontbreekt de sitemap? Meld dit en plaats geen links.
-- Bovenliggende pagina: URL minus de laatste slug. Ankertekst = paginanaam of primair zoekwoord.
-- Max. ${maxLinks} clusterlinks per pagina, alleen inhoudelijk passend.
-- Artikel- of expertisepagina: minimaal één link naar de meest logische product- of dienstpagina.
-- Ankertekst altijd beschrijvend. Nooit: "hier", "klik hier" of kale URL.
-- Externe links: alleen officiële bronnen, nooit naar concurrenten.
+- Raadpleeg \`${sitemap}\` vóór schrijven. Ontbreekt → melden, geen links.
+- Bovenliggende pagina = URL minus laatste slug. Ankertekst = paginanaam of primair zoekwoord.
+- Max ${maxLinks} clusterlinks per pagina, alleen inhoudelijk passend.
+- Artikel/expertise: ≥1 link naar logische product-/dienstpagina.
+- Ankertekst beschrijvend. Nooit "hier", "klik hier", kale URL.
+- Externe links: alleen officiële bronnen. Nooit concurrenten.
 
----
+## Zelfcheck
 
-## Zelfcheck en rationale
+Voor elke aflevering. Herstel elke "nee". Sluit altijd af met rationale-blok.
 
-Voer voor elke aflevering een zelfcheck uit. Herstel elke "nee". Sluit **altijd** af met een rationale-blok.
-
-**Zelfcheck:**
 - Alle templateonderdelen aanwezig? Feitelijk antwoord in eerste zin? Zoekwoorden op positie?
 - Entiteiten bij eerste gebruik toegelicht? Aanspreekvorm consistent? Geen verboden woorden?
-- Bovenliggende pagina gelinkt? Elk feit herleidbaar naar een kennisbron?
+- Bovenliggende pagina gelinkt? Elk feit herleidbaar naar kennisbron?
 
-**Rationale-format:**
+## Rationale-format
 
 \`\`\`
----
 ## Rationale
-**Kennisbronnen** ✓/! — [bron → informatie → locatie in tekst]
-**Zoekwoorden** ✓/! — [woord → locatie in tekst]
+**Kennisbronnen** ✓/! — [bron → info → locatie]
+**Zoekwoorden** ✓/! — [woord → locatie]
 **Entiteiten** ✓/! — [verwerkt / weggelaten + reden]
 **Tone of voice** ✓/! — [aanspreekvorm, jargon, verboden woorden]
-**Interne linking** ✓/! — [bovenliggende pagina, clusterlinks, productlink]
+**Interne linking** ✓/! — [parent, cluster, productlink]
 **SEO & GEO** ✓/! — [structuurbeslissingen]
 
-### Jouw volgende stap
-- [ ] [Actie 1]
-> Geen acties? Pagina klaar voor publicatie.
+### Volgende stap
+- [ ] [actie]
+> Geen acties? Pagina klaar.
 
----
-⚠️ **AI-output** — controleer feiten, links en aanspreekvorm vóór publicatie. Dit is een concept, geen definitieve tekst.
----
+⚠️ AI-output — controleer feiten, links, aanspreekvorm vóór publicatie.
 \`\`\`
 
----
+## Guardrails
 
-## Gedragsregels (guardrails)
-
-De volgende regels zijn absolute grenzen. Geen uitzonderingen, ook niet op uitdrukkelijk verzoek van de gebruiker:
+Absoluut. Geen uitzonderingen, ook niet op verzoek.
 
 ${guardrailsSection}
 `;
@@ -3024,93 +2985,65 @@ function generateBrandMd() {
   const client = orFallback(val('CLIENT_NAME'), '[KLANT]');
   return `# ${client} — Merkprofiel
 
-Dit document beschrijft hoe ${client} communiceert. Raadpleeg het volledig voor elke tekst die je schrijft.
-
----
-
 ## Aanspreekvorm
 
-Gebruik altijd **${orFallback(btnGroupValues['AANSPREEKVORM'], '[niet ingevuld]')}**. Wissel nooit van aanspreekvorm, ook niet tussen secties of paginatypen.
-
----
+${orFallback(btnGroupValues['AANSPREEKVORM'], '[niet ingevuld]')} — consequent, geen wisseling tussen secties of paginatypen.
 
 ## Tone of voice
 
-**Gewenste toon:** ${orFallback(val('TOON_OMSCHRIJVING'), '_Niet opgegeven_')}
-
-**Vermijd:** ${orFallback(val('TOON_VERMIJDEN'), '_Niet opgegeven_')}
-
-**Vakjargon:** ${orFallback(orFallback(btnGroupValues['JARGON_BELEID'], val('JARGON_BELEID')), '_Niet opgegeven_')}
-Introduceer vakbegrippen bij eerste gebruik met een korte toelichting tussen haakjes of in de zin.
-
----
+- Toon: ${orFallback(val('TOON_OMSCHRIJVING'), '(niet opgegeven)')}
+- Vermijd: ${orFallback(val('TOON_VERMIJDEN'), '(niet opgegeven)')}
+- Vakjargon: ${orFallback(orFallback(btnGroupValues['JARGON_BELEID'], val('JARGON_BELEID')), '(niet opgegeven)')}
+- Vakbegrip eerste gebruik: korte toelichting tussen haakjes of in de zin.
 
 ## Merkwaarden
 
-${orFallback(val('MERKWAARDEN_LIJST'), '_Niet opgegeven_')}
+${orFallback(val('MERKWAARDEN_LIJST'), '(niet opgegeven)')}
 
-Merkwaarden komen **impliciet** terug in de tekst. Noem ze nooit letterlijk.
-
----
+Impliciet verwerken. Nooit letterlijk noemen.
 
 ## Communicatiepijlers
 
-De volgende thema's vormen de inhoudelijke basis van alle content. Elke pagina sluit aan bij minimaal één pijler:
+Elke pagina sluit aan bij ≥1 pijler.
 
 ${pairedToMd('pijlers')}
 
----
-
 ## Kernuitkomsten
 
-De drie resultaten die ${client} levert voor de klant:
-
 ${chipsToMd('uitkomsten')}
-
----
 
 ## Redactionele invalshoek
 
 ${chipsToMd('strategie')}
 
----
-
 ## Merktermen
 
-Verwerk minstens 2–3 van de onderstaande merktermen **per pagina**, op een natuurlijke manier. Nooit gestapeld of geforceerd.
+Verwerk 2–3 per pagina, natuurlijk. Niet gestapeld of geforceerd.
 
 ${pairedToMd('merktermen')}
 
----
-
 ## Doelgroep
 
-**Rol / functietitel:** ${orFallback(val('DOELGROEP_ROL'), '_Niet opgegeven_')}
-**Sector / branche:** ${orFallback(val('DOELGROEP_SECTOR'), '_Niet opgegeven_')}
-**Kennisniveau:** ${orFallback(btnGroupValues['DOELGROEP_NIVEAU'], '_Niet opgegeven_')}
+- Rol: ${orFallback(val('DOELGROEP_ROL'), '(niet opgegeven)')}
+- Sector: ${orFallback(val('DOELGROEP_SECTOR'), '(niet opgegeven)')}
+- Kennisniveau: ${orFallback(btnGroupValues['DOELGROEP_NIVEAU'], '(niet opgegeven)')}
 
-**Primaire zorgen:**
+Zorgen:
 ${chipsToMd('zorgen')}
 
-**Hoe de doelgroep problemen omschrijft (gebruik hun taal):**
-${orFallback(val('DOELGROEP_VOCABULAIRE'), '_Niet opgegeven_')}
+Vocabulaire (taal van de doelgroep): ${orFallback(val('DOELGROEP_VOCABULAIRE'), '(niet opgegeven)')}
 
-**Wat extra onderbouwing vereist (claims die ze niet zomaar geloven):**
-${orFallback(val('DOELGROEP_WANTROUWEN'), '_Niet opgegeven_')}
-
----
+Wantrouwen (vereist extra onderbouwing): ${orFallback(val('DOELGROEP_WANTROUWEN'), '(niet opgegeven)')}
 
 ## Verboden woorden
 
-De volgende woorden mogen **nooit** voorkomen in teksten van ${client}:
+Nooit gebruiken:
 
 ${chipsToMd('verboden')}
 
----
-
 ## Stijldocumenten
 
-Raadpleeg de volgende documenten vóór het schrijven. Ontbreekt een document? Meld dit en wacht op bevestiging.
+Raadpleeg vóór schrijven. Ontbrekend → melden en wachten.
 
 ${stijldocToMd()}
 `;
@@ -3126,102 +3059,76 @@ function generateSeoMd() {
     : [];
   const isNieuw = urlType === 'nieuw';
   const urlTypeNote = isNieuw
-    ? '> **Let op:** de onderstaande URL\'s zijn **toekomstige URL\'s** voor een nieuwe of gemigreerde website. Schrijf alle links alsof deze pagina\'s al bestaan.'
-    : '> De onderstaande URL\'s zijn de **huidige live URL\'s** van de website.';
+    ? 'Onderstaande URL\'s zijn TOEKOMSTIG (nieuwe site / migratie). Schrijf alsof ze al bestaan.'
+    : 'Onderstaande URL\'s zijn LIVE.';
   const urlListSection = sitemapUrls.length
-    ? `\n---\n\n## Hoofdpagina's voor interne linking\n\n${urlTypeNote}\n\nGebruik onderstaande URL's als ankerpunten bij interne linking. Kies altijd de meest inhoudelijk relevante URL voor de context.\n\n${sitemapUrls.map(u => `- ${u}`).join('\n')}\n`
+    ? `\n## Hoofdpagina's voor interne linking\n\n${urlTypeNote}\n\nGebruik als ankerpunt. Kies meest inhoudelijk relevante URL.\n\n${sitemapUrls.map(u => `- ${u}`).join('\n')}\n`
     : '';
-  return `# SEO & GEO Richtlijnen
+  return `# SEO & GEO
 
-Dit document beschrijft de universele regels voor content die presteert in zowel traditionele zoekmachines als AI-zoekmachines. Pas **alle regels** toe bij elke pagina die je schrijft.
+Universeel. Alle regels gelden bij elke pagina.
 
----
+## SEO
 
-## Laag 1 — SEO-regels
+- Primair zoekwoord in H1 (verbatim).
+- Primair zoekwoord in meta_title (vooraan, max 65 tekens).
+- Primair zoekwoord in eerste of tweede zin van eerste alinea (verbatim).
+- Secundaire zoekwoorden: ≥2 in H2/H3, natuurlijk geplaatst.
+- Koppenstructuur H1 → H2 → H3, geen niveaus overslaan.
+- meta_title: max 65 tekens, primair zoekwoord vooraan, geen punt, geen onnodige hoofdletters.
+- meta_description: 140–155 tekens, primair zoekwoord + belofte/CTA, geen marketingtaal.
+- slug: kleine letters, koppeltekens, geen stopwoorden, max 5 woorden.
 
-| Regel | Detail |
-|-------|--------|
-| Primair zoekwoord in H1 | Verbatim, niet geparafraseerd |
-| Primair zoekwoord in meta_title | Dicht bij het begin, max. 65 tekens |
-| Primair zoekwoord in eerste alinea | Verbatim, in de eerste of tweede zin |
-| Secundaire zoekwoorden in H2/H3 | Minimaal 2, op natuurlijke wijze geplaatst |
-| Koppenstructuur | H1 → H2 → H3, geen niveaus overslaan |
-| Meta description | Max. 155 tekens, duidelijke waardepropositie |
+## GEO
 
-**Meta-velden:**
-- \`meta_title\`: max. 65 tekens. Primair zoekwoord vooraan. Geen punt. Geen onnodige hoofdletters.
-- \`meta_description\`: 140–155 tekens. Primair zoekwoord + belofte of CTA. Geen marketingtaal.
-- \`slug\`: kleine letters, koppeltekens, geen stopwoorden, max. 5 woorden.
+BLUF (Bottom Line Up Front):
+- ≥4 H2-koppen als directe gebruikersvraag.
+- Eerste zin onder vraag-H2 beantwoordt direct, geen inleiding.
+- Elke feitelijke zin zelfstandig leesbaar (AI citeert zonder context).
 
----
-
-## Laag 2 — GEO-regels (Generative Engine Optimisation)
-
-### Direct antwoord — Bottom Line Up Front
-
-- Minimaal 4 H2-koppen zijn geformuleerd als directe gebruikersvragen (bijv. "Wat kost een dakkapel gemiddeld?")
-- De eerste zin onder een vraag-H2 beantwoordt de vraag **direct** — geen inleiding, geen context
-- Elke feitelijke zin moet zelfstandig leesbaar zijn: een AI moet hem kunnen citeren zonder de omringende context
-
-### Zelfstandige zinnen
-
-Gebruik nooit voornaamwoorden ("dit", "het", "deze oplossing", "het systeem") zonder het onderwerp in diezelfde zin te benoemen.
-
+Zelfstandige zinnen:
+- Geen voornaamwoorden ("dit", "het", "deze") zonder onderwerp in dezelfde zin.
 - ❌ "Dit zorgt voor een hogere conversie."
 - ✓ "Een geoptimaliseerde landingspagina zorgt voor een hogere conversie."
 
-### Semantische triple-structuur
-
-Feitelijke zinnen volgen de opbouw **Onderwerp → Werkwoord → Object**. Dit is hoe AI-modellen feiten intern opslaan en ophalen.
-
+Semantic triple (Onderwerp → Werkwoord → Object):
 - ❌ "Voor starters is hypotheekadvies beschikbaar."
-- ✓ "[Organisatie] biedt hypotheekadvies voor starters op de woningmarkt."
+- ✓ "[Organisatie] biedt hypotheekadvies voor starters."
 
-### Entiteitsdichtheid boven zoekwoorddichtheid
+Entiteitsdichtheid > zoekwoorddichtheid:
+- Geen mechanische herhaling. Gebruik gerelateerde concepten, productnamen, domeinterminologie.
 
-Herhaal het exacte zoekwoord niet mechanisch. Gebruik het volledige ecosysteem van gerelateerde concepten, productnamen en domeinterminologie. Dit toont vakkennis aan AI-modellen en vergroot de kans op citatie.
+Informatiemeerwaarde:
+- Elke sectie ≥1 feit dat niet in generiek zoekresultaat staat (specifieke kenmerken, branchecijfers, precieze specs met bron).
 
-### Informatiemeerwaarde
+Machine-leesbaar:
+- Lijst bij ≥3 vergelijkbare items.
+- Tabel bij vergelijkingen, kostenopbouw, specificaties (verplicht bij vergelijkende content).
+- Vergelijkingstabel eindigt met "Bron:"-rij.
 
-Elke sectie bevat minimaal één feit dat **niet** beschikbaar is in een generiek zoekresultaat. Gebruik specifieke productkenmerken, branchegegevens of precieze specificaties met bron.
+Inline bronvermelding:
+- Elk percentage/cijfer wordt bij gebruik toegeschreven, niet alleen onderaan. Voorbeeld: "Volgens [bron] daalt de responstijd met 40%."
 
-### Machine-leesbare opmaak
-
-- Gebruik **opsommingslijsten** voor kenmerken, voordelen, criteria en risicofactoren
-- Gebruik **tabellen** voor vergelijkingen, kostenopbouw en specificaties — verplicht bij vergelijkende content
-- Elke vergelijkingstabel eindigt met een "Bron:"-rij
-
-### Inline bronvermelding
-
-Elk percentage of cijfer wordt **op de plek van gebruik** toegeschreven, niet alleen in een bronnenblok onderaan. Voorbeeld: "Volgens onderzoek van [bron] daalt de responstijd met 40%."
-
-### Beschrijvende ankertekst
-
-Elke CTA en interne link beschrijft exact wat de doelpagina bevat.
-
+Beschrijvende ankertekst:
 - ❌ "Klik hier", "Lees meer", "Meer informatie"
 - ✓ "Lees hoe wij hypotheekadvies voor starters aanpakken"
 
----
-
 ## Interne linking
 
-- Raadpleeg \`${sitemap}\` vóór het schrijven. Ontbreekt de sitemap? Meld dit en plaats geen interne links.
-- **Bovenliggende pagina:** URL minus de laatste slug. Ankertekst = paginanaam of primair zoekwoord.
-- **Max. ${maxLinks} clusterlinks** per pagina, alleen inhoudelijk passend.
-- **Artikel- of expertisepagina:** minimaal één link naar de meest logische product- of dienstpagina.
-- **Ankertekst:** altijd beschrijvend. Nooit: "hier", "klik hier" of kale URL.
-- **Externe links:** alleen officiële bronnen, nooit naar concurrenten.
+- Raadpleeg \`${sitemap}\` vóór schrijven. Ontbreekt → melden, geen links.
+- Bovenliggende pagina = URL minus laatste slug. Ankertekst = paginanaam of primair zoekwoord.
+- Max ${maxLinks} clusterlinks per pagina, alleen inhoudelijk passend.
+- Artikel/expertise: ≥1 link naar logische product-/dienstpagina.
+- Ankertekst beschrijvend. Nooit "hier", "klik hier", kale URL.
+- Externe links: alleen officiële bronnen. Nooit concurrenten.
 
----
+## Alinea + kop
 
-## Alinea- en kopregels
-
-- Eén concept per alinea (50–150 woorden). Zelfstandig leesbaar.
-- Open met een contextzin. Sluit af met een feitelijke conclusie die een AI 1-op-1 kan overnemen.
-- Koppen zijn volledige vragen of stellingen. Vraagkop → direct antwoord in eerste zin.
-- Nooit starten met "het", "deze", "hij" of "zij" als het onderwerp al in de vorige zin stond.
-- Geen fluff: vervang "de beste", "hoogwaardig" en "veel" door feiten en cijfers.
+- Eén concept per alinea (50–150 woorden), zelfstandig leesbaar.
+- Open met contextzin, sluit met feitelijke conclusie (AI overneembaar).
+- Koppen = volledige vraag of stelling. Vraagkop → direct antwoord in eerste zin.
+- Nooit starten met "het", "deze", "hij", "zij" als onderwerp al in vorige zin stond.
+- Geen fluff. Vervang "beste", "hoogwaardig", "veel" door feiten en cijfers.
 ${urlListSection}`;
 }
 
@@ -3229,49 +3136,45 @@ ${urlListSection}`;
 function getIntakeVragenMd(type) {
   const vragen = getIntakeVragen(type);
   if (!vragen.length) return '';
-  return '\n\n**Stel deze vragen vóór het schrijven (aanvullend op de standaard intake):**\n' +
-    vragen.map(v => '- ' + v).join('\n');
+  return '\nExtra intake (vóór schrijven, naast standaard):\n' +
+    vragen.map(v => '- ' + v).join('\n') + '\n';
 }
 
 function generateTemplatesMd() {
   const client = orFallback(val('CLIENT_NAME'), '[KLANT]');
   const doelmarkt = btnGroupValues['DOELMARKT'] || '';
-  let doelmarktNote = '';
-  if (doelmarkt === 'B2B') {
-    doelmarktNote = `\n> **Doelmarkt: B2B** — Schrijf voor zakelijke beslissers. Nadruk op ROI, procesverbeteringen en zakelijke risico's. Gebruik vakjargon op expertniveau. Vermijd consumentenjargon.\n`;
-  } else if (doelmarkt === 'B2C') {
-    doelmarktNote = `\n> **Doelmarkt: B2C** — Schrijf voor consumenten. Nadruk op persoonlijk voordeel, gemak en emotionele waarde. Vermijd overmatig zakelijk of technisch jargon.\n`;
-  } else if (doelmarkt === 'Beide') {
-    doelmarktNote = `\n> **Doelmarkt: B2B én B2C** — Pas de toon aan per context. Zakelijk als de doelgroep een beslisser of professional is; consumentgericht als de doelgroep een individu is.\n`;
-  }
+  const doelmarktNote = doelmarkt === 'B2B'
+    ? '\nDOELMARKT: B2B. Zakelijke beslissers. Nadruk op ROI, proces, risico. Vakjargon expertniveau.\n'
+    : doelmarkt === 'B2C'
+    ? '\nDOELMARKT: B2C. Consumenten. Nadruk op voordeel, gemak, emotie. Vermijd overmatig zakelijk/technisch jargon.\n'
+    : doelmarkt === 'Beide'
+    ? '\nDOELMARKT: B2B + B2C. Toon aanpassen per context: zakelijk bij beslisser/professional, consumentgericht bij individu.\n'
+    : '';
 
   return `# Content Templates — ${client}
 ${doelmarktNote}
----
+## Funnel-volgorde
+
+Bewustwording → Probleem → Oplossing → Bewijs → Conversie
 
 ## Standaard paginastructuur
 
-De structuur volgt een bewuste contentfunnel:
-**Bewustwording → Probleemverdieping → Oplossing → Bewijs → Conversie**
-
-| Blok | Naam | Kernelementen |
-|------|------|---------------|
-| 0 | SEO Metadata | meta_title (max. 65 tekens), meta_description (max. 155 tekens), slug |
-| 1 | Hero | H1 (probleem van de doelgroep, max. 8 woorden) |
-| 2 | Kernpunten | H2, exact 3 bullets — elk met een meetbaar resultaat, geen productnamen |
-| 3 | Introductie | H2 als vraag van de doelgroep, alinea (max. 4 zinnen) |
-| 3B | Definitie | H2 "Wat is [onderwerp]?" — gezaghebbende definitie, geen statistieken, geen producten |
-| 4 | Probleemschets | H2 als vraag, 1–2 alinea's, tabel (verplicht), CTA |
-| 5 | Impact | H2 als kostenvraag, 1–2 alinea's met cijfer, optionele tabel, CTA |
-| 6 | Aanpak | H2, per product/dienst: H3 + alinea van 4 zinnen (wat / hoe / data / voordeel), CTA |
-| 7 | USP-lijst | H2, exact 4 USP's (1–2 woord kop + 1 zin met getal of feit) |
-| 8 | Referenties | Placeholder — in te vullen door editor |
-| 9 | FAQ | Exact 7 vragen + antwoorden (praktisch / kosten / ROI / vergelijking / proces / regelgeving / data) |
-| 11 | Bronnen | H2, 3–5 bronnen uit de vertrouwde bronnenlijst in \`knowledge.md\` |
-| 12 | Gerelateerde blogs | Placeholder — 3 kaarten |
-| 13 | Gerelateerde producten/diensten | Placeholder |
-
----
+| # | Blok | Specs |
+|---|------|-------|
+| 0 | SEO meta | meta_title ≤65 tekens, meta_description ≤155 tekens, slug |
+| 1 | Hero | H1 = probleem doelgroep, ≤8 woorden |
+| 2 | Kernpunten | H2 + 3 bullets, elk met meetbaar resultaat, geen productnamen |
+| 3 | Introductie | H2 als vraag, alinea ≤4 zinnen |
+| 3B | Definitie | H2 "Wat is [onderwerp]?" gezaghebbend, geen statistieken/producten |
+| 4 | Probleemschets | H2 als vraag, 1–2 alinea's, tabel verplicht, CTA |
+| 5 | Impact | H2 als kostenvraag, 1–2 alinea's met cijfer, tabel optioneel, CTA |
+| 6 | Aanpak | H2 + per product/dienst H3 + alinea (4 zinnen: wat/hoe/data/voordeel), CTA |
+| 7 | USP-lijst | H2 + 4 USP's (1–2 woord kop + 1 zin met getal/feit) |
+| 8 | Referenties | placeholder — editor |
+| 9 | FAQ | 7 vragen+antwoorden (praktisch/kosten/ROI/vergelijking/proces/regelgeving/data) |
+| 11 | Bronnen | H2 + 3–5 bronnen uit knowledge.md |
+| 12 | Gerelateerde blogs | placeholder — 3 kaarten |
+| 13 | Gerelateerde producten | placeholder |
 
 ## Paginatypen
 
@@ -3279,146 +3182,127 @@ De structuur volgt een bewuste contentfunnel:
 
 | Kop | Doel |
 |-----|------|
-| Wat doet [dienst] precies? | Directe definitie, max. 100 woorden |
-| Voor wie is [dienst] geschikt? | Doelgroep en probleemomschrijving |
-| Hoe werkt [dienst]? | Max. 5 stappen als genummerde lijst |
-| Wat zijn de kosten van [dienst]? | Prijsindicatie of vergelijkingstabel |
-| Waarom ${client} voor [dienst]? | Max. 3 feitelijk onderbouwde argumenten |
-| [CTA-kop] | Één duidelijke call-to-action |
+| Wat doet [dienst] precies? | Definitie, ≤100 woorden |
+| Voor wie is [dienst] geschikt? | Doelgroep + probleem |
+| Hoe werkt [dienst]? | ≤5 genummerde stappen |
+| Wat zijn de kosten van [dienst]? | Prijsindicatie of tabel |
+| Waarom ${client} voor [dienst]? | ≤3 feitelijk onderbouwde argumenten |
+| [CTA-kop] | Eén CTA |
 ${getIntakeVragenMd('dienstpagina')}
-
 ### Productpagina
 
 | Kop | Doel |
 |-----|------|
-| Wat is [product]? | Definitie, max. 80 woorden |
-| Wat zijn de specificaties van [product]? | Specificatietabel met bronrij |
-| Wat zijn de voordelen van [product]? | Max. 4 voordelen als lijst, elk met feit of cijfer |
+| Wat is [product]? | Definitie, ≤80 woorden |
+| Wat zijn de specificaties van [product]? | Specificatietabel + bronrij |
+| Wat zijn de voordelen van [product]? | ≤4 voordelen, elk met feit/cijfer |
 | [Product] vs. [alternatief]: wat is het verschil? | Vergelijkingstabel |
 | Hoe vraag ik [product] aan of bestel ik het? | Kort proces + CTA |
 ${getIntakeVragenMd('productpagina')}
-
 ### Artikelpagina
 
 | Kop | Doel |
 |-----|------|
-| [Hoofdvraag] | Directe beantwoording in max. 150 woorden — featured snippet-alinea |
-| [Subvraag 1] | Verdieping deelonderwerp 1 |
-| [Subvraag 2] | Verdieping deelonderwerp 2 |
-| [Meer subvragen] | Voeg toe naar behoefte |
-| Conclusie: [kernboodschap] | Max. 100 woorden + minimaal één link naar product- of dienstpagina |
+| [Hoofdvraag] | Direct antwoord ≤150 woorden, featured snippet |
+| [Subvraag 1..N] | Verdieping per deelonderwerp |
+| Conclusie: [kernboodschap] | ≤100 woorden + ≥1 link naar product/dienst |
 ${getIntakeVragenMd('artikelpagina')}
+## GEO-proof product/dienstpagina
 
----
+Gebruik bij pagina's die ook AI-zoekmachines moeten citeren.
 
-## GEO-proof product- en dienstpagina
+| # | Element | Specs |
+|---|---------|-------|
+| 0 | SEO meta | meta_title ≤65 tekens primair zoekwoord vooraan, meta_description 140–155 tekens, slug |
+| 1 | Hero H1 | Primair zoekwoord verbatim. Eerste zin = directe definitie (semantic triple: [Organisatie] biedt [product] voor [doelgroep]) |
+| 2 | Featured snippet | H2 "Wat is [product/dienst]?" antwoord ≤60 woorden, feitelijk, zelfstandig. Elke zin citeert organisatie/product |
+| 3 | Doelgroep | H2 "Voor wie is [product/dienst] geschikt?" specifiek, eindig met herkenbaar probleem |
+| 4 | Kenmerken | H2 "Wat zijn de kenmerken…" opsomming, elk punt met feit/meting |
+| 5 | Voordelen | H2 "Wat zijn de voordelen…" ≤4 voordelen (kop 1–3 woorden + zin met getal/bewijs) |
+| 6 | Werking | H2 "Hoe werkt [product/dienst]?" ≤5 genummerde stappen, elke ≤1 zin, slot = uitkomstzin |
+| 7 | Vergelijking | H2 "[A] vs. [B]: wat is het verschil?" verplichte vergelijkingstabel + bronrij |
+| 8 | Kosten | H2 "Wat kost [product/dienst]?" prijsindicatie of tabel, geen vage taal, slot = CTA |
+| 9 | Bewijs | H2 "Waarom [Organisatie] voor [product/dienst]?" ≤3 argumenten, elk onderbouwd |
+| 10 | FAQ | 5–7 H3-vraagkoppen, elk antwoord ≤50 woorden, direct + feitelijk |
+| 11 | CTA | H2 actiekop, één CTA |
+| 12 | Bronnen | H2 "Bronnen" 2–4 verwijzingen uit knowledge.md |
 
-Gebruik deze structuur voor product- en dienstpagina's die ook door AI-zoekmachines geciteerd moeten worden.
-
-| Blok | Element | Doel & GEO-instructie |
-|------|---------|----------------------|
-| 0 | SEO Metadata | meta_title (max. 65 tekens, primair zoekwoord vooraan), meta_description (140–155 tekens, zoekwoord + belofte), slug |
-| 1 | Hero H1 | Primair zoekwoord verbatim in H1. Eerste zin = directe definitie van het product of de dienst (semantic triple: [Organisatie] biedt [product] aan voor [doelgroep]) |
-| 2 | Featured snippet | H2 als "Wat is [product/dienst]?" — antwoord in max. 60 woorden, feitelijk, zelfstandig leesbaar. Elke zin citeert de organisatienaam of het product |
-| 3 | Doelgroep | H2 als "Voor wie is [product/dienst] geschikt?" — specifiek, geen vage omschrijvingen. Eindig met herkenbaar probleem van de doelgroep |
-| 4 | Kenmerken | H2 als "Wat zijn de kenmerken van [product/dienst]?" — opsommingslijst, elk punt met feit of meting |
-| 5 | Voordelen | H2 als "Wat zijn de voordelen van [product/dienst]?" — max. 4 voordelen, elk als **kop (1–3 woorden)** + zin met getal of bewijs |
-| 6 | Werking | H2 als "Hoe werkt [product/dienst]?" — genummerde stappen (max. 5), elke stap max. 1 zin. Sluit af met een uitkomstzin |
-| 7 | Vergelijking | H2 als "[Product A] vs. [Product B]: wat is het verschil?" — verplichte vergelijkingstabel met bronrij |
-| 8 | Kosten | H2 als "Wat kost [product/dienst]?" — prijsindicatie of tabel. Nooit vage formuleringen. Eindig met CTA |
-| 9 | Bewijs | H2 als "Waarom [Organisatie] voor [product/dienst]?" — max. 3 argumenten, elk onderbouwd met feit, cijfer of referentie |
-| 10 | FAQ | Exact 5–7 vragen die de doelgroep stelt — geformuleerd als H3-vraagkoppen. Elk antwoord max. 50 woorden, direct en feitelijk |
-| 11 | CTA | H2 als actiekop (beschrijvend, geen "klik hier") — één duidelijke call-to-action |
-| 12 | Bronnen | H2 "Bronnen" — 2–4 verwijzingen naar vertrouwde externe bronnen uit \`knowledge.md\` |
-
-**GEO-checks voor product/dienstpagina's:**
-- Elke sectie start met een vraag-H2 → eerste zin beantwoordt direct
-- Organisatienaam en productnaam komen elk minimaal 3× voor op de pagina, altijd volledig uitgeschreven
-- Geen alinea die begint met een voornaamwoord zonder bijpassend zelfstandig naamwoord in diezelfde zin
-- Elk feit heeft een inline bronvermelding ("Volgens [bron], ...")
-
----
+GEO-checks:
+- Elke sectie start met vraag-H2 → eerste zin antwoordt direct.
+- Organisatienaam + productnaam ≥3× per pagina, volledig uitgeschreven.
+- Geen alinea die start met voornaamwoord zonder onderwerp in dezelfde zin.
+- Elk feit heeft inline bronvermelding ("Volgens [bron], …").
 
 ## Case / Social proof
 
-> **Afwijkend schrijfregime — SEO is hier niet leidend.**
-> SEO-regels (zoekwoorden in H1/H2, featured snippets, FAQ-structuur) zijn op dit contenttype **niet van toepassing**. Schrijf voor mensen, niet voor algoritmes. De kracht zit in herkenbaarheid, oprechtheid en een concreet verhaal. Geen marketingtaal. Geen superlatieven. Feiten en gevoelens mogen naast elkaar bestaan.
+AFWIJKEND REGIME: SEO niet leidend. Geen zoekwoorden in H1/H2, geen featured snippets, geen FAQ. Schrijf voor mensen. Kracht: herkenbaarheid + oprechtheid + concreet verhaal. Geen marketingtaal. Geen superlatieven. Feiten en gevoelens naast elkaar.
 
-### Schrijfprincipes voor cases en social proof
+Principes:
+- Klant is protagonist, niet ${client}. ${client} = oplossing, niet held.
+- Concreet > vaag. Namen, rollen, sectoren, getallen, tijdsperioden. "30% minder handmatig werk" > "aanzienlijke tijdsbesparing".
+- Echte quotes, niet gepolijst. Letterlijke formulering klant indien beschikbaar.
+- Emotie toegestaan (frustratie vóór, opluchting na). Maakt geloofwaardig.
+- CTA uitnodigend, niet dwingend. Geen "neem nú contact op".
 
-- **Vertel het verhaal van de klant, niet van ${client}.** De klant is de protagonist — ${client} is de oplossing, niet de held.
-- **Concreet boven vaag.** Namen, rollen, sectoren, getallen, tijdsperioden. "30% minder handmatig werk" is beter dan "aanzienlijke tijdsbesparing".
-- **Echte quotes, niet gepolijste PR-zinnen.** Een quote klinkt menselijk of hij klinkt niet. Gebruik de letterlijke formulering van de klant als die beschikbaar is.
-- **Emotie is toegestaan.** Frustratie vóór de samenwerking, opluchting na. Dit maakt het geloofwaardig.
-- **Geen verkooppraatje aan het einde.** De CTA is uitnodigend en laagdrempelig — niet "neem nú contact op".
+### Casepagina (lang)
 
-### Structuur — Casepagina (lang formaat)
-
-| Blok | Element | Instructie |
-|------|---------|-----------|
-| 1 | Openingszin | Beschrijf de situatie van de klant vóór de samenwerking. Geen bedrijfsnaam in de eerste zin — begin bij het probleem of de context. Max. 2 zinnen. |
-| 2 | Klantprofiel | Rol, sector, organisatiegrootte, context. Alinea van max. 3 zinnen. Geen opsomming. |
-| 3 | De uitdaging | Wat liep er vast? Waarom was dit een probleem? Schrijf vanuit het perspectief van de klant. Max. 2 alinea's. |
-| 4 | De aanpak | Wat is er gedaan, in welke volgorde, waarom? Narratief — geen bullet-lijst van stappen. Max. 3 alinea's. |
-| 5 | Het resultaat | Meetbare uitkomsten + menselijke impact. Begin met het meest concrete getal of feit. Max. 2 alinea's. |
-| 6 | Quote (verplicht) | Één authentieke uitspraak van de klant. Naam + functietitel vermelden. Niet parafraseren. |
-| 7 | Reflectie | Één alinea van max. 3 zinnen: wat zegt dit over de aanpak of de samenwerking? Geen herhaling van resultaten. |
-| 8 | Soft CTA | Uitnodigend, niet dwingend. Aanspreekvorm uit \`brand.md\`. Max. 2 zinnen. |
+| # | Element | Specs |
+|---|---------|-------|
+| 1 | Opening | Situatie klant vóór samenwerking. Geen bedrijfsnaam in eerste zin. ≤2 zinnen. |
+| 2 | Klantprofiel | Rol, sector, omvang, context. Alinea ≤3 zinnen. Geen opsomming. |
+| 3 | Uitdaging | Wat liep vast, waarom probleem. Vanuit klantperspectief. ≤2 alinea's. |
+| 4 | Aanpak | Wat, volgorde, waarom. Narratief, geen bullets. ≤3 alinea's. |
+| 5 | Resultaat | Meetbaar + menselijk. Open met meest concrete getal/feit. ≤2 alinea's. |
+| 6 | Quote (verplicht) | Authentiek, naam + functie. Niet parafraseren. |
+| 7 | Reflectie | ≤3 zinnen. Wat zegt dit over aanpak/samenwerking. Geen herhaling resultaten. |
+| 8 | Soft CTA | Uitnodigend. Aanspreekvorm uit brand.md. ≤2 zinnen. |
 ${getIntakeVragenMd('case')}
+### Social proof snippet (kort)
 
-### Structuur — Social proof snippet (kort formaat)
+Voor testimonials, reviewblokken, quotes op landingspagina's.
 
-Gebruik dit voor testimonials, reviewblokken en quotes op landingspagina's.
-
-| Element | Instructie |
-|---------|-----------|
-| Context (optioneel) | Max. 1 zin: rol of sector van de klant, zonder naam |
-| Quote | Letterlijke uitspraak, max. 60 woorden |
-| Naam + functie | Voornaam + achternaam, functietitel, eventueel organisatie |
-| Resultaat (optioneel) | Één concreet getal of feit onder de quote — visueel losstaand |
+| Element | Specs |
+|---------|-------|
+| Context (optioneel) | ≤1 zin: rol/sector, zonder naam |
+| Quote | Letterlijk, ≤60 woorden |
+| Naam + functie | Voornaam + achternaam, functietitel, evt. organisatie |
+| Resultaat (optioneel) | Eén getal/feit, visueel losstaand |
 ${getIntakeVragenMd('social-proof')}
+NIET DOEN bij case/social-proof:
+- Zoekwoorden in koppen/eerste zinnen forceren
+- FAQ toevoegen
+- Productomschrijvingen kopiëren uit kennisbank
+- Toon formeel maken voor "professioneel"
+- "Wij zijn trots op onze samenwerking met…"
+- Resultaten claimen zonder onderbouwing klant
 
-### Wat je NIET doet in case- en social proof content
+Case-zelfcheck:
+- Klant centraal, niet ${client}?
+- ≥1 concrete meting/feit?
+- Quote authentiek?
+- Opening bij probleem, niet oplossing?
+- Geen marketingtaal/superlatieven?
 
-- ✗ Zoekwoorden forceren in koppen of eerste zinnen
-- ✗ FAQ-blokken toevoegen
-- ✗ Productomschrijvingen kopiëren uit de kennisbank
-- ✗ De toon formeel maken om "professioneel" te klinken
-- ✗ Generieke zinnen als "wij zijn trots op onze samenwerking met..."
-- ✗ Resultaten claimen zonder concrete onderbouwing van de klant
+## Element-regels
 
-### Zelfcheck voor cases
+Koppen:
+- ≤8 woorden, vraag of stelling, sentence case.
+- Vraagkop → eerste zin antwoordt direct.
 
-- Staat de klant centraal, niet ${client}?
-- Is er minimaal één concrete meting of feit?
-- Is de quote authentiek en niet gepolijst?
-- Begint de opening bij het probleem, niet bij de oplossing?
-- Ontbreekt marketingtaal en zijn superlatieven vermeden?
+Alinea's:
+- ≤3 zinnen en ≤60 woorden.
+- Open contextzin, sluit feitelijke conclusie.
+- Geen openers "In dit artikel…", "Het is belangrijk…", "Als [doelgroep]…".
+- Eén idee per alinea, zelfstandig leesbaar.
 
----
+Lijsten + tabellen:
+- Lijst bij ≥3 vergelijkbare items.
+- Tabel bij vergelijkingen, specificaties, kostenopbouw.
+- Elke tabel eindigt met "Bron:"-rij.
 
-## Schrijfregels per element
-
-### Koppen
-- Max. 8 woorden
-- Geformuleerd als directe vraag of stellende kop die aandacht verdient
-- Sentence case — geen onnodige hoofdletters
-- Vraagkop → eerste zin beantwoordt de vraag direct
-
-### Alinea's
-- Max. 3 zinnen en 60 woorden
-- Open met contextzin, sluit af met feitelijke conclusie
-- Geen openers als "In dit artikel…", "Het is belangrijk…" of "Als [doelgroep]…"
-- Eén idee per alinea — zelfstandig leesbaar
-
-### Lijsten en tabellen
-- Lijst bij drie of meer vergelijkbare items
-- Tabel bij vergelijkingen, specificaties of kostenopbouw
-- Elke tabel eindigt met een "Bron:"-rij
-
-### CTA's
-- Één actie per blok
-- Ankertekst beschrijft de bestemming exact — nooit "klik hier"
+CTA:
+- Eén actie per blok.
+- Ankertekst beschrijft bestemming exact, nooit "klik hier".
 `;
 }
 
@@ -3456,30 +3340,23 @@ function generateKnowledgeMd() {
 
   return `# Kennisbank — ${client}
 
-Gebruik **alleen** de onderstaande bronnen en gegevens. Verzin geen feiten. Ontbreekt informatie die je nodig hebt? Meld dit aan de gebruiker en vraag om aanvulling.
-
----
+ALLEEN onderstaande bronnen + gegevens gebruiken. Verzin geen feiten. Ontbrekend → melden + om aanvulling vragen.
 
 ## Productcatalogus
 
-De onderstaande URL's zijn ${urlTypeLabel}.
+URL's = ${urlTypeLabel}.
 
 ${productenSection}${clusterSection}
 
----
+## Kennisbronnen (prioriteit hoog → laag)
 
-## Kennisbronnen
-
-Hogere prioriteit wint bij conflicterende informatie.
-
-**1. Wetgeving (hoogste prioriteit)**
+1. Wetgeving (hoogste prioriteit, conflict-winner):
 ${chipsToMd('wetgeving')}
 
-**2. Interne kennisbank**
+2. Interne kennisbank:
 ${chipsToMd('kennisbank')}
 
-**3. Gebruikersinput**
-Vult de kennisbank aan. Overschrijft wetgeving nooit.
+3. Gebruikersinput: vult aan, overschrijft wetgeving nooit.
 ${externeBronnenSection}
 `;
 }
