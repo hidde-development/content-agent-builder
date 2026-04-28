@@ -1216,17 +1216,10 @@
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>SEO &amp; Interne linking</span></div>
 
-    <div class="field-row">
-      <div class="field">
-        <label>Sitemap bestandsnaam</label>
-        <div class="hint">Naam van het sitemap-bestand dat je hierboven uploadt. Heb je hem nog niet? Open <strong>uw-domein.nl/sitemap.xml</strong> in je browser → rechtsklik op de pagina → "Opslaan als" → sla op als <code>sitemap.xml</code>. Ook te downloaden via Google Search Console (Sitemaps) of rechtstreeks vanuit Webflow / WordPress.</div>
-        <input type="text" id="SITEMAP_BESTANDSNAAM" placeholder="sitemap.xml" />
-      </div>
-      <div class="field">
-        <label>Max. interne links per pagina</label>
-        <div class="hint">Hoeveel interne links mag de agent maximaal plaatsen in één pagina?</div>
-        <input type="number" id="MAX_CLUSTER_LINKS" placeholder="bijv. 5" min="1" />
-      </div>
+    <div class="field">
+      <label>Max. interne links per pagina</label>
+      <div class="hint">Hoeveel interne links mag de agent maximaal plaatsen in één pagina?</div>
+      <input type="number" id="MAX_CLUSTER_LINKS" placeholder="bijv. 5" min="1" />
     </div>
 
     <div class="field">
@@ -2184,7 +2177,6 @@ function applyFields(fields) {
     CLIENT_NAME: 'CLIENT_NAME', AGENCY_NAME: 'AGENCY_NAME', DATUM: 'DATUM',
     TOON_OMSCHRIJVING: 'TOON_OMSCHRIJVING', TOON_VERMIJDEN: 'TOON_VERMIJDEN',
     MERKWAARDEN_LIJST: 'MERKWAARDEN_LIJST',
-    SITEMAP_BESTANDSNAAM: 'SITEMAP_BESTANDSNAAM',
     DOELGROEP_ROL: 'DOELGROEP_ROL', DOELGROEP_SECTOR: 'DOELGROEP_SECTOR',
     DOELGROEP_VOCABULAIRE: 'DOELGROEP_VOCABULAIRE', DOELGROEP_WANTROUWEN: 'DOELGROEP_WANTROUWEN',
   };
@@ -2323,8 +2315,7 @@ seo_en_geo:
   - Lijst bij drie of meer items. Vergelijkingen en specificaties → Markdown-tabel.
   - Geschikt voor FAQ-schema en HowTo-schema. Expertisegedreven, geen woorddoel.
   interne_linking:
-    sitemap: "[SITEMAP_BESTANDSNAAM]"
-    sitemap_regel: "Raadpleeg vóór schrijven. Ontbreekt: meld, geen links. URL ontbreekt: leid hiërarchie af uit URL-structuur."
+    bron: "URL-lijsten in seo.md (hoofdpagina's) en knowledge.md (producten, clusters). Geen sitemap.xml runtime."
     regels:
       - "Bovenliggende pagina: URL minus laatste slug. Ankertekst = paginanaam of primair zoekwoord."
       - "Max. [MAX_CLUSTER_LINKS] clusterpaginalinks, alleen inhoudelijk passend."
@@ -2640,7 +2631,7 @@ function generateOutput() {
     'CLIENT_NAME', 'AGENCY_NAME', 'DATUM', 'MAX_WOORDEN_PER_ZIN',
     'TOON_OMSCHRIJVING', 'TOON_VERMIJDEN', 'MERKWAARDEN_LIJST',
     'MERKDOCUMENT_BESTANDSNAAM', 'SCHRIJFWIJZER_BESTANDSNAAM', 'TOV_DOCUMENT_BESTANDSNAAM',
-    'SITEMAP_BESTANDSNAAM', 'MAX_CLUSTER_LINKS',
+    'MAX_CLUSTER_LINKS',
     'MIN_PRIMAIR', 'MIN_SEC',
     'INFORMATIEVE_VRAAG', 'COMMERCIELE_VRAAG', 'NAVIGATIONELE_VRAAG', 'TRANSACTIONELE_VRAAG',
   ];
@@ -2666,7 +2657,7 @@ function generateOutput() {
 }
 
 // ── Progress ──────────────────────────────────────────────────────────────
-const TOTAL_FIELDS = 27;
+const TOTAL_FIELDS = 26;
 
 function countFilled() {
   let n = 0;
@@ -2674,7 +2665,7 @@ function countFilled() {
     'CLIENT_NAME', 'AGENCY_NAME', 'DATUM',
     'MAX_WOORDEN_PER_ZIN', 'MAX_WOORDEN_PER_ALINEA',
     'TOON_OMSCHRIJVING', 'TOON_VERMIJDEN', 'MERKWAARDEN_LIJST',
-    'SITEMAP_BESTANDSNAAM', 'MAX_CLUSTER_LINKS',
+    'MAX_CLUSTER_LINKS',
     'DOELGROEP_ROL', 'DOELGROEP_SECTOR', 'DOELGROEP_VOCABULAIRE', 'DOELGROEP_WANTROUWEN',
   ];
   simpleIds.forEach(id => { if (document.getElementById(id)?.value.trim()) n++; });
