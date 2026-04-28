@@ -987,6 +987,22 @@
       <div id="template-file-display"></div>
     </div>
 
+    <!-- SEO-strategie sheet upload -->
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--off-white)">
+      <div style="font-size:13px;font-weight:600;color:var(--near-black);margin-bottom:4px">SEO-strategie sheet (optioneel)</div>
+      <div style="font-size:12px;color:var(--mid-grey);margin-bottom:10px">Excel-bestand met sitestructuur, keywords, redirects, paginatemplates en entiteiten. De builder leest de structuur en vult relevante velden hieronder in (entiteiten, paginatypen) — werkt met de Goldfizh blueprint (5 vaste tabbladen).</div>
+      <div class="upload-zone" id="sheet-upload-zone" style="padding:16px 20px;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="document.getElementById('sheet-input').click()">
+        <input type="file" id="sheet-input" accept=".xlsx,.xls" onchange="handleSheetUpload(this.files[0])" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" />
+        <div class="upload-icon" style="margin:0;flex-shrink:0">↑</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--near-black)">Sleep je .xlsx hierheen of klik om te uploaden</div>
+          <div class="upload-hint">XLSX · Tabbladen: SITESTRUCTUUR, HUIDIGE_PAGINAS, REDIRECTLIST, ENTITEITEN, T01_…</div>
+        </div>
+      </div>
+      <div id="sheet-status" class="analyse-status" style="margin-top:12px;display:none"></div>
+      <div id="sheet-preview" style="margin-top:14px;display:none"></div>
+    </div>
+
     <button class="btn-analyse" id="btn-analyse" disabled onclick="analyseFiles()">
       <span id="analyse-label">Analyseer en vul in</span>
     </button>
@@ -1235,26 +1251,10 @@
     </div>
   </div>
 
-  <!-- SEO-strategie (sitestructuur sheet) -->
-  <div class="section-card">
-    <div class="section-label"><div class="section-square"></div><span>SEO-strategie <span style="font-weight:400;color:var(--mid-grey);font-size:13px">(optioneel)</span></span></div>
-
-    <div class="hint" style="margin-bottom:16px">
-      Heb je een Excel-bestand met de complete site-strategie — toekomstige URL's, keywords per pagina, redirects, paginatemplates, entiteiten? Upload hem hier. De builder leest de structuur en gebruikt 'm om de agent klantspecifieker te maken: per-pagina briefings, klantspecifieke templates en een redirect-bewuste interne linking. Werkt met de Goldfizh blueprint (5 vaste tabbladen: <code>SITESTRUCTUUR</code>, <code>HUIDIGE_PAGINAS</code>, <code>REDIRECTLIST</code>, <code>ENTITEITEN</code> en één tab per template <code>T01_…</code>, <code>T02_…</code>).
-    </div>
-
-    <div id="sheet-upload-zone" class="extra-knowledge-dropzone" onclick="document.getElementById('sheet-input').click()">
-      <input type="file" id="sheet-input" accept=".xlsx,.xls" onchange="handleSheetUpload(this.files[0])" style="display:none" />
-      <span>+ Klik hier of sleep een .xlsx hierheen</span>
-    </div>
-
-    <div id="sheet-status" class="analyse-status" style="margin-top:12px;display:none"></div>
-    <div id="sheet-preview" style="margin-top:16px;display:none"></div>
-  </div>
-
   <!-- Kennisbronnen -->
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>Kennisbronnen</span></div>
+    <div class="hint" style="margin-bottom:16px">Scheid items met een komma of druk Enter na elk item.</div>
 
     <div class="field">
       <label>Wetgeving</label>
@@ -2109,11 +2109,11 @@ function escapeHtml(s) {
   if (!zone) return;
   ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation();
-    zone.classList.add('drag');
+    zone.classList.add('drag-over');
   }));
   ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation();
-    zone.classList.remove('drag');
+    zone.classList.remove('drag-over');
   }));
   zone.addEventListener('drop', e => {
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
