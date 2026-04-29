@@ -2793,6 +2793,10 @@ function generateSetupMd() {
   const today  = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
   // Sitemap.xml hoeft NIET als kennisbijlage; URL-lijst zit al in seo.md / knowledge.md
   const brandFiles = uploadedFiles.filter(f => !f.name.toLowerCase().endsWith('.xml'));
+  const hasSheet = !!(parsedSheet && parsedSheet.sitestructuur && parsedSheet.sitestructuur.pages && parsedSheet.sitestructuur.pages.length);
+  const sheetFilesNote = hasSheet
+    ? `\n\nExtra (uit SEO-strategie sheet):\n- \`knowledge/briefings.md\` — per-pagina briefings\n- \`knowledge/site-architectuur.md\` — URL-hiërarchie\n${parsedSheet.redirects && !parsedSheet.redirects.error ? '- `knowledge/redirects.md` — oude → nieuwe URL-mapping\n' : ''}${parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length ? '- `knowledge/entiteiten.md` — verplichte termen\n' : ''}${parsedSheet.templates && parsedSheet.templates.length ? `- \`templates/T01.md\`, \`T02.md\`, … — klantspecifieke paginastructuren (${parsedSheet.templates.length} stuks)\n` : ''}`
+    : '';
   return `# Installatie — ${client} Content Agent
 
 Gegenereerd ${today}.
@@ -2808,7 +2812,7 @@ In deze volgorde:
 1. \`brand.md\`
 2. \`seo.md\`
 3. \`templates.md\`
-4. \`knowledge.md\`
+4. \`knowledge.md\`${sheetFilesNote}
 
 URL-lijsten zitten al in seo.md (hoofdpagina's) en knowledge.md (producten + clusters). Sitemap.xml NIET uploaden — agent leest 'm niet runtime.
 
@@ -2855,8 +2859,24 @@ function generateSystemPromptMd() {
     ? guardrails.map(g => `- ${g.naam}${g.desc ? `: ${g.desc}` : ''}`).join('\n')
     : '- (geen)';
 
-  const customTemplateNote = customTemplateFile
-    ? `\nEIGEN_TEMPLATE: \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is leidend voor paginastructuur. Standaard-templates in templates.md = fallback voor wat het eigen template niet dekt.\n`
+  // Sheet-aanwezigheid bepaalt welke instructies actief zijn (Fase 2 — Keuze D)
+  const hasSheet = !!(parsedSheet && parsedSheet.sitestructuur && parsedSheet.sitestructuur.pages && parsedSheet.sitestructuur.pages.length);
+  const hasSheetTemplates = !!(parsedSheet && parsedSheet.templates && parsedSheet.templates.length);
+  const hasSheetEntiteiten = !!(parsedSheet && parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length);
+  const sheetTemplateCodes = hasSheetTemplates ? parsedSheet.templates.map(t => `${t.code} (${t.naam || 'naam onbekend'})`).join(', ') : '';
+
+  // Template-prioriteit (custom-template + sheet co-existence)
+  let customTemplateNote = '';
+  if (customTemplateFile && hasSheetTemplates) {
+    customTemplateNote = `\nTEMPLATE_BRON: sheet-templates (${sheetTemplateCodes}) leiden de paginastructuur per type. \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is stijlreferentie voor toon en ritme — niet voor structuur.\n`;
+  } else if (customTemplateFile) {
+    customTemplateNote = `\nEIGEN_TEMPLATE: \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is leidend voor paginastructuur. Standaard-templates in templates.md = fallback.\n`;
+  } else if (hasSheetTemplates) {
+    customTemplateNote = `\nTEMPLATE_BRON: sheet-templates (${sheetTemplateCodes}) per paginatype in \`templates/Txx.md\`. templates.md = fallback voor types zonder sheet-template.\n`;
+  }
+
+  const sheetBronnenNote = hasSheet
+    ? `\n\n## Sheet-data (per-pagina briefings)\n\nKlant heeft een SEO-strategie sheet aangeleverd. Naast de algemene kennisbijlagen ook beschikbaar:\n- \`knowledge/briefings.md\` — per toekomstige URL: template, keywords, parent, consolidatiebronnen\n- \`knowledge/site-architectuur.md\` — URL-hiërarchie met parents en kinderen\n${parsedSheet.redirects && !parsedSheet.redirects.error ? '- `knowledge/redirects.md` — oude → nieuwe URL-mapping\n' : ''}${hasSheetEntiteiten ? '- `knowledge/entiteiten.md` — verplichte brede termen (≥2-3 per pagina)\n' : ''}${hasSheetTemplates ? '- `templates/T01.md`, `T02.md`, … — klantspecifieke paginastructuren\n' : ''}\nWERKWIJZE bij opdracht "schrijf pagina [URL]":\n1. Zoek de URL in briefings.md → gebruik die briefing als intake (skip handmatige intake-vragen).\n2. Pak de gekoppelde Template uit templates/. Geen template? Val terug op templates.md.\n3. Bij ≥2 bronnen in briefing: activeer consolidatiemodus.\n4. Voor interne linking: gebruik site-architectuur.md (parent + kinderen) en redirects.md (oude URL's vermijden).`
     : '';
 
   const bronnenNote = extraKnowledgeFiles.length
@@ -2883,7 +2903,7 @@ Raadpleeg vóór schrijven, volledig:
 - \`templates.md\` (fallback) — paginastructuren
 
 PRIORITEIT: brand.md > regels in dit document. Bij conflict wint brand.md.
-Ontbrekende bijlage → melden en wachten.${bronnenNote}
+Ontbrekende bijlage → melden en wachten.${sheetBronnenNote}${bronnenNote}
 
 ## Intake
 
@@ -2981,6 +3001,10 @@ ${guardrailsSection}
 // ── brand.md ──────────────────────────────────────────────────────────────
 function generateBrandMd() {
   const client = orFallback(val('CLIENT_NAME'), '[KLANT]');
+  const sheetEnt = (parsedSheet && parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length) ? parsedSheet.entiteiten.terms : null;
+  const sheetEntSection = sheetEnt
+    ? `\n\n## Verplichte entiteiten (uit SEO-strategie)\n\n${sheetEnt.length} brede termen voor merkkoppeling in AI-zoekresultaten (AEO/GEO). Verwerk minimaal 2-3 per pagina, natuurlijk, niet gestapeld:\n\n${sheetEnt.map(t => `- ${t}`).join('\n')}\n\nDeze hebben voorrang op de algemene Merktermen-lijst hieronder bij conflict.`
+    : '';
   return `# ${client} — Merkprofiel
 
 ## Aanspreekvorm
@@ -3018,7 +3042,7 @@ ${chipsToMd('strategie')}
 
 Verwerk 2–3 per pagina, natuurlijk. Niet gestapeld of geforceerd.
 
-${pairedToMd('merktermen')}
+${pairedToMd('merktermen')}${sheetEntSection}
 
 ## Doelgroep
 
@@ -3360,6 +3384,156 @@ ${externeBronnenSection}
 `;
 }
 
+// ── Sheet-derived MD generators (Fase 2a) ─────────────────────────────────
+// Genereert ZIP-bestanden uit parsedSheet. Alleen actief als sheet aanwezig.
+
+function generateSheetTemplateMd(t) {
+  const lines = [`# ${t.code}${t.naam ? ' — ' + t.naam : ''}`, ''];
+  if (t.gebruik)  lines.push(`Gebruik wanneer: ${t.gebruik}`);
+  if (t.doel)     lines.push(`Doel: ${t.doel}`);
+  if (t.intentie) lines.push(`Zoekintentie: ${t.intentie}`);
+  if (t.gebruik || t.doel || t.intentie) lines.push('');
+
+  if (t.sections.length) {
+    lines.push('## Secties (in volgorde)');
+    lines.push('');
+    for (const s of t.sections) {
+      const heading = `${s.nr}. ${s.sectie}${s.voorbeeld ? ': ' + s.voorbeeld : ''}`;
+      lines.push(`### ${heading}`);
+      if (s.instructie) lines.push(`Instructie: ${s.instructie}`);
+      if (s.entiteiten) lines.push(`Entiteiten: ${s.entiteiten}`);
+      if (s.cta && s.cta !== '-') lines.push(`CTA / link: ${s.cta}`);
+      lines.push('');
+    }
+  }
+  return lines.join('\n');
+}
+
+function pageParent(url) {
+  const trimmed = url.replace(/\/$/, '');
+  const parts = trimmed.split('/');
+  if (parts.length <= 3) return '(homepage)'; // e.g. https://x.nl
+  return parts.slice(0, -1).join('/');
+}
+
+function generateSheetSiteArchitectureMd() {
+  if (!parsedSheet || !parsedSheet.sitestructuur || parsedSheet.sitestructuur.error) return null;
+  const pages = parsedSheet.sitestructuur.pages.filter(p => p.url);
+  if (!pages.length) return null;
+
+  const lines = [
+    '# Site-architectuur',
+    '',
+    `${pages.length} toekomstige pagina's. Per pagina: template, parent, directe kinderen.`,
+    'Gebruik dit voor interne linking: parent als bovenliggende pagina, kinderen als clusterlinks.',
+    ''
+  ];
+
+  // Index parent → children
+  const childMap = new Map();
+  for (const p of pages) {
+    const parent = pageParent(p.url);
+    if (!childMap.has(parent)) childMap.set(parent, []);
+    childMap.get(parent).push(p.url);
+  }
+
+  for (const p of pages) {
+    const url = p.url;
+    const parent = pageParent(url);
+    const myUrlTrim = url.replace(/\/$/, '');
+    const directChildren = (childMap.get(myUrlTrim) || []);
+
+    lines.push(`## ${url}`);
+    if (p.template) lines.push(`Template: ${p.template}`);
+    lines.push(`Parent: ${parent}`);
+    if (directChildren.length) lines.push(`Kinderen (${directChildren.length}): ${directChildren.join(', ')}`);
+    if (p.opmerking) lines.push(`Opmerking: ${p.opmerking}`);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function generateSheetBriefingsMd() {
+  if (!parsedSheet || !parsedSheet.sitestructuur || parsedSheet.sitestructuur.error) return null;
+  const pages = parsedSheet.sitestructuur.pages.filter(p => p.url);
+  if (!pages.length) return null;
+
+  const lines = [
+    '# Pagina-briefings',
+    '',
+    `Per toekomstige URL: template, keywords (gesorteerd op volume), parent, bronnen voor consolidatie. ${pages.length} pagina's.`,
+    'Bij opdracht "schrijf pagina X": zoek hier op URL, gebruik deze briefing als intake-input.',
+    ''
+  ];
+
+  for (const p of pages) {
+    lines.push(`## ${p.url}`);
+    if (p.template) lines.push(`Template: ${p.template}`);
+    const parent = pageParent(p.url);
+    if (parent && parent !== '(homepage)') lines.push(`Parent: ${parent}`);
+
+    if (p.keywords && p.keywords.length) {
+      const sorted = [...p.keywords].sort((a, b) => (b.volume || 0) - (a.volume || 0));
+      const primair = sorted[0];
+      const secundair = sorted.slice(1, 4);
+      const longtail = sorted.slice(4);
+
+      const fmt = k => k.term + (k.volume ? ` (vol ${k.volume}${k.positie ? ', pos ' + k.positie : ''})` : '');
+      if (primair) lines.push(`Primair zoekwoord: ${fmt(primair)}`);
+      if (secundair.length) lines.push(`Secundair: ${secundair.map(fmt).join(', ')}`);
+      if (longtail.length) {
+        const ll = longtail.slice(0, 8).map(k => k.term).join(', ');
+        lines.push(`Long-tail: ${ll}${longtail.length > 8 ? ` (+${longtail.length - 8})` : ''}`);
+      }
+    }
+
+    if (p.huidigeLinks && p.huidigeLinks.length) {
+      lines.push(`Consolidatiebronnen (${p.huidigeLinks.length}):`);
+      for (const u of p.huidigeLinks.slice(0, 20)) lines.push(`- ${u}`);
+      if (p.huidigeLinks.length > 20) lines.push(`- … (${p.huidigeLinks.length - 20} meer)`);
+    }
+
+    if (p.opmerking) lines.push(`Opmerking: ${p.opmerking}`);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function generateSheetRedirectsMd() {
+  if (!parsedSheet || !parsedSheet.redirects || parsedSheet.redirects.error) return null;
+  const r = parsedSheet.redirects;
+
+  const dupSet = new Set(r.duplicates.map(d => d.url));
+  const selfSet = new Set(r.selfRefs.map(e => e.oud));
+
+  const valid = r.entries.filter(e => e.oud && !dupSet.has(e.oud) && !selfSet.has(e.oud));
+  if (!valid.length) return null;
+
+  const lines = [
+    '# Redirect-map',
+    '',
+    `${valid.length} geldige migraties uit oude site → nieuwe site. Format: oud → nieuw.`,
+    'Gebruik bij interne linking: linkt een interne tekst naar een oude URL? Vervang door de nieuwe.',
+    'URL niet in lijst en ook niet in site-architectuur.md? Niet linken.',
+    '',
+    '## Migraties',
+    ''
+  ];
+
+  for (const e of valid) {
+    lines.push(`- ${e.oud} → ${e.nieuw}`);
+  }
+
+  if (r.duplicates.length || r.selfRefs.length) {
+    lines.push('');
+    lines.push('## Validatie-issues (uit te sluiten)');
+    lines.push('');
+    if (r.duplicates.length) lines.push(`${r.duplicates.length} dubbele oude URL's — één URL kan niet naar meerdere plekken redirecten.`);
+    if (r.selfRefs.length) lines.push(`${r.selfRefs.length} self-redirects — URL verwijst naar zichzelf.`);
+  }
+  return lines.join('\n');
+}
+
 // ── Sitemap parser ────────────────────────────────────────────────────────
 let parsedSitemapData = null; // { navUrls, productUrls, clusters, allUrls }
 
@@ -3619,6 +3793,40 @@ async function _doDownloadCustomAgent() {
     zip.file('seo.md',           generateSeoMd());
     zip.file('templates.md',     generateTemplatesMd());
     zip.file('knowledge.md',     generateKnowledgeMd());
+
+    // Sheet-derived bestanden (Fase 2a) — alleen als parsedSheet aanwezig
+    if (parsedSheet) {
+      // Eén MD per template
+      if (parsedSheet.templates && parsedSheet.templates.length) {
+        for (const t of parsedSheet.templates) {
+          zip.file(`templates/${t.code}.md`, generateSheetTemplateMd(t));
+        }
+      }
+      // Site-architectuur
+      const archMd = generateSheetSiteArchitectureMd();
+      if (archMd) zip.file('knowledge/site-architectuur.md', archMd);
+
+      // Per-pagina briefings
+      const briefMd = generateSheetBriefingsMd();
+      if (briefMd) zip.file('knowledge/briefings.md', briefMd);
+
+      // Redirect-map
+      const redirMd = generateSheetRedirectsMd();
+      if (redirMd) zip.file('knowledge/redirects.md', redirMd);
+
+      // Entiteiten als verplichte termen — bewaar als losse referentie
+      if (parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length) {
+        const entLines = [
+          '# Verplichte entiteiten',
+          '',
+          `${parsedSheet.entiteiten.terms.length} brede termen. Verwerk minimaal 2-3 per pagina, natuurlijk, niet gestapeld.`,
+          'Doel: merknaam koppelen aan deze begrippen in AI-zoekresultaten (AEO/GEO).',
+          '',
+          ...parsedSheet.entiteiten.terms.map(t => `- ${t}`)
+        ];
+        zip.file('knowledge/entiteiten.md', entLines.join('\n'));
+      }
+    }
 
     // Include custom template if uploaded
     if (customTemplateFile) {
