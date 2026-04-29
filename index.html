@@ -6786,6 +6786,21 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   // Init bij DOMContentLoaded (script staat onderaan, dus DOM is al klaar)
   initSheetPicker();
 
+  // Robuuste response parser: leest eerst als tekst, parseert daarna als JSON.
+  // Bij niet-JSON server-output (Vercel-error, HTML-fout) toont de error de
+  // echte server-body ipv de cryptische "Unexpected token 'A', is not valid JSON".
+  async function parseResponse(res) {
+    const text = await res.text();
+    if (!text) {
+      throw new Error('Server-fout (' + res.status + '): lege response.');
+    }
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error('Server-fout (' + res.status + '): ' + text.slice(0, 400));
+    }
+  }
+
   async function schrijfPagina(btn) {
     const url = document.getElementById('w-url').value.trim();
     const keywords = document.getElementById('w-keywords').value.trim();
@@ -6813,7 +6828,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         headers: authHeaders(),
         body: JSON.stringify({ url, pageType: pagetypeValue, keywords, brief, sources, style: styleValue, templateCode }),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok || !data.success) throw new Error(data.error || 'Onbekende fout');
       document.getElementById('w-content').textContent = data.content;
       document.getElementById('w-output').classList.add('show');
@@ -6908,7 +6923,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         headers: authHeaders(),
         body: JSON.stringify({ page: lastPage, verdict: lastVerdict, pageType: pagetypeValue }),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok || !data.success) throw new Error(data.error || 'Onbekende fout');
       setStatus('w-status', '✓ Gepubliceerd als concept in het CMS.', 'success');
       btn.textContent = '✓ Gepubliceerd';
@@ -6941,7 +6956,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
           headers: authHeaders(),
           body: JSON.stringify({ urls, completed, batchSize: 3, pageType: migratePagetype, keywords }),
         });
-        const data = await res.json();
+        const data = await parseResponse(res);
         if (!res.ok) throw new Error(data.error || 'API fout');
 
         (data.results || []).forEach(r => addResultItem(r));
@@ -7002,7 +7017,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         headers: authHeaders(),
         body: JSON.stringify({ oldUrls, newUrls, permanent: redirectPermanent }),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) throw new Error(data.error || 'API fout');
 
       const table = document.createElement('table');
@@ -7049,7 +7064,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
 
     try {
       const res = await fetch('/api/cms-export', { method: 'POST', headers: authHeaders(), body: JSON.stringify({}) });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) throw new Error(data.error || 'API fout');
 
       const bytes = atob(data.base64);
@@ -7100,7 +7115,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
           headers: authHeaders(),
           body: JSON.stringify({ data: fileData, mimeType, operation: importOp, completed, batchSize: 10 }),
         });
-        const data = await res.json();
+        const data = await parseResponse(res);
         if (!res.ok) throw new Error(data.error || 'API fout');
 
         completed = data.completed || [];
