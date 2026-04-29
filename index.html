@@ -3981,6 +3981,17 @@ async function generateAndDownloadLangChain(cmsConfig, migrationConfig = {}, rev
   zip.file('knowledge/templates.md',   generateTemplatesMd());
   zip.file('knowledge/knowledge.md',   generateKnowledgeMd());
 
+  // Sheet-derived bestanden (Fase 2) — alleen bij parsedSheet aanwezig
+  if (parsedSheet) {
+    if (parsedSheet.templates && parsedSheet.templates.length) {
+      for (const t of parsedSheet.templates) {
+        zip.file(`templates/${t.code}.md`, generateSheetTemplateMd(t));
+      }
+    }
+    const briefMd = generateSheetBriefingsMd();
+    if (briefMd) zip.file('knowledge/briefings.md', briefMd);
+  }
+
   if (mig) {
     zip.file('api/redirects.js',               lcGenApiRedirects(fmt));
     zip.file('api/cms-export.js',              lcGenApiCmsExport(cmsConfig));
@@ -4231,13 +4242,14 @@ function lcGenApiAgent(reviewEnabled = false) {
       "  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });",
       '  if (!checkAuth(req, res)) return;',
       '',
-      '  const { url, pageType = "dienstpagina", keywords = "", brief = "", sources = [], style = "feitelijk" } = req.body || {};',
+      '  const { url, pageType = "dienstpagina", keywords = "", brief = "", sources = [], style = "feitelijk", templateCode = null } = req.body || {};',
       '',
       '  try {',
       '    const agent = createContentAgent();',
+      '    const tplLine = templateCode ? "\\nKlantspecifieke template: " + templateCode + " (gebruik deze als paginastructuur via write_page tool met templateCode-veld)." : "";',
       '    const input = sources.length',
-      '      ? "Consolideer de volgende " + sources.length + " bronpagina\'s en schrijf één sterke pagina.\\nStijl: " + style + "\\nURL: " + url + "\\nPaginatype: " + pageType + "\\nZoekwoorden: " + keywords + "\\nBronnen om op te halen: " + sources.join(", ")',
-      '      : "Schrijf een " + pageType + ".\\nStijl: " + style + "\\nURL: " + url + "\\nZoekwoorden: " + keywords + "\\nOpdracht: " + brief;',
+      '      ? "Consolideer de volgende " + sources.length + " bronpagina\'s en schrijf één sterke pagina.\\nStijl: " + style + "\\nURL: " + url + "\\nPaginatype: " + pageType + "\\nZoekwoorden: " + keywords + tplLine + "\\nBronnen om op te halen: " + sources.join(", ")',
+      '      : "Schrijf een " + pageType + ".\\nStijl: " + style + "\\nURL: " + url + "\\nZoekwoorden: " + keywords + tplLine + "\\nOpdracht: " + brief;',
       '',
       '    const result = await agent.invoke({ input });',
       '    return res.status(200).json({ success: true, content: result.output, style });',
@@ -4261,10 +4273,11 @@ function lcGenApiAgent(reviewEnabled = false) {
     '  return true;',
     '}',
     '',
-    'function buildInput({ url, pageType, keywords, brief, sources, style }) {',
+    'function buildInput({ url, pageType, keywords, brief, sources, style, templateCode }) {',
+    '  const tplLine = templateCode ? "\\nKlantspecifieke template: " + templateCode + " (gebruik via write_page templateCode-veld)." : "";',
     '  return sources.length',
-    "    ? \"Consolideer de volgende \" + sources.length + \" bronpagina's en schrijf één sterke pagina.\\nStijl: \" + style + \"\\nURL: \" + url + \"\\nPaginatype: \" + pageType + \"\\nZoekwoorden: \" + keywords + \"\\nBronnen om op te halen: \" + sources.join(\", \")",
-    '    : "Schrijf een " + pageType + ".\\nStijl: " + style + "\\nURL: " + url + "\\nZoekwoorden: " + keywords + "\\nOpdracht: " + brief;',
+    "    ? \"Consolideer de volgende \" + sources.length + \" bronpagina's en schrijf één sterke pagina.\\nStijl: \" + style + \"\\nURL: \" + url + \"\\nPaginatype: \" + pageType + \"\\nZoekwoorden: \" + keywords + tplLine + \"\\nBronnen om op te halen: \" + sources.join(\", \")",
+    '    : "Schrijf een " + pageType + ".\\nStijl: " + style + "\\nURL: " + url + "\\nZoekwoorden: " + keywords + tplLine + "\\nOpdracht: " + brief;',
     '}',
     '',
     'function extractPage(output) {',
@@ -4281,12 +4294,13 @@ function lcGenApiAgent(reviewEnabled = false) {
     '  const {',
     '    url, pageType = "dienstpagina", keywords = "",',
     '    brief = "", sources = [], style = "feitelijk",',
+    '    templateCode = null,',
     '  } = req.body || {};',
     '',
     '  try {',
     '    const agent = createContentAgent();',
     '    // 1. Writer → v1',
-    '    const v1 = await agent.invoke({ input: buildInput({ url, pageType, keywords, brief, sources, style }) });',
+    '    const v1 = await agent.invoke({ input: buildInput({ url, pageType, keywords, brief, sources, style, templateCode }) });',
     '    const pageV1 = extractPage(v1.output);',
     '    const contentV1 = pageV1.content || v1.output;',
     '',
@@ -4299,7 +4313,7 @@ function lcGenApiAgent(reviewEnabled = false) {
     '',
     '    // 3. Auto-revise bij oranje (max 1x)',
     '    if (review.verdict === "orange" && review.revisionPrompt) {',
-    '      const reviseInput = buildInput({ url, pageType, keywords, brief, sources, style }) +',
+    '      const reviseInput = buildInput({ url, pageType, keywords, brief, sources, style, templateCode }) +',
     '        "\\n\\nREVISIE-INSTRUCTIE: " + review.revisionPrompt +',
     '        "\\n\\nBESTAANDE OUTPUT:\\n" + contentV1;',
     '      const v2 = await agent.invoke({ input: reviseInput });',
@@ -4914,7 +4928,7 @@ function lcGenPrompts(cfg, migration = false, reviewEnabled = false) {
     '1. Laad altijd eerst de relevante kennisbestanden via load_knowledge',
     '2. Haal bronpagina\'s op via fetch_url_content als URL\'s zijn meegegeven',
     '3. Consolideer meerdere bronnen via consolidate_sources',
-    '4. Schrijf de pagina via write_page',
+    '4. Schrijf de pagina via write_page. ALS de input een "Klantspecifieke template: Txx" regel bevat: geef die code mee als templateCode-parameter aan write_page — dan gebruikt de tool de structuur uit templates/Txx.md (klantspecifiek) ipv de generieke fallback. Geen Txx in input? Laat templateCode leeg.',
     '5. Valideer via validate_output — bij paginatype "case" of "social proof": valideer alleen op toon en guardrails, niet op SEO',
     reviewEnabled
       ? '6. NIET publiceren. De review-pipeline beslist na jouw output of er gepubliceerd mag worden (via /api/publish). Geef als laatste antwoord ALLEEN het JSON-object dat uit write_page kwam — geen uitleg eromheen.'
@@ -5081,21 +5095,32 @@ function lcGenToolWritePage() {
     "import { tool } from '@langchain/core/tools';",
     "import { z } from 'zod';",
     "import { ChatAnthropic } from '@langchain/anthropic';",
-    "import { readKnowledge } from './load-knowledge.js';",
+    "import { readKnowledge, readTemplate, readBriefing } from './load-knowledge.js';",
     '',
     "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-sonnet-4-6', maxTokens: 4096, topP: 1 });",
     '',
     'export const writePageTool = tool(',
-    '  async ({ brief, pageType, url, keywords }) => {',
+    '  async ({ brief, pageType, url, keywords, templateCode = null }) => {',
     '    try {',
     '      const { brand, seo, templates, knowledge } = await readKnowledge();',
     "      const isCaseType = pageType === 'case' || pageType === 'social proof snippet';",
+    '',
+    '      // Klantspecifieke template uit templates/Tnn.md (heeft voorrang op generieke templates.md)',
+    '      const customTpl = templateCode ? readTemplate(templateCode) : null;',
+    "      const tplBlock = customTpl",
+    "        ? '## KLANTSPECIFIEKE TEMPLATE (' + templateCode + ') — leidend voor structuur\\n\\n' + customTpl + '\\n\\n---\\n\\n## Generieke fallback (alleen als sheet-template een aspect niet dekt)\\n\\n' + templates",
+    "        : templates;",
+    '',
+    '      // Per-URL briefing uit briefings.md (geeft de agent contextuele intel: parent, kinderen, primair zoekwoord, opmerking)',
+    '      const urlBriefing = url ? readBriefing(url) : null;',
+    "      const briefingBlock = urlBriefing ? '\\n\\n---\\n\\n## URL-briefing (uit SEO-strategie)\\n\\n' + urlBriefing : '';",
+    '',
     '      const systemContent = isCaseType',
-    '        ? brand + "\\n\\n---\\n\\n" + templates + "\\n\\n---\\n\\n" + knowledge',
-    '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + templates + "\\n\\n---\\n\\n" + knowledge;',
+    '        ? brand + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock',
+    '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock;',
     '      const userPrompt = isCaseType',
     "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
-    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...\",\"meta_description\":\"...\",\"slug\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}';",
+    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...\",\"meta_description\":\"...\",\"slug\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}';",
     '      const response = await model.invoke([',
     "        { role: 'system', content: systemContent },",
     "        { role: 'user',   content: userPrompt }",
@@ -5103,19 +5128,20 @@ function lcGenToolWritePage() {
     "      const raw = typeof response.content === 'string' ? response.content : (response.content[0]?.text || '');",
     '      const match = raw.match(/{[\\s\\S]*}/);',
     "      const page = match ? (() => { try { return JSON.parse(match[0]); } catch { return { content: raw }; } })() : { content: raw };",
-    "      return JSON.stringify({ success: true, page: { ...page, ai_generated: true, generated_at: new Date().toISOString() } });",
+    "      return JSON.stringify({ success: true, page: { ...page, ai_generated: true, generated_at: new Date().toISOString(), template_used: templateCode || null } });",
     '    } catch (err) {',
     '      return JSON.stringify({ success: false, error: err.message });',
     '    }',
     '  },',
     '  {',
     "    name: 'write_page',",
-    "    description: 'Schrijf een complete webpagina op basis van een brief. Gebruikt brand-, SEO- en templateregels automatisch. Gebruik NIET voor het ophalen van bronmateriaal.',",
+    "    description: 'Schrijf een complete webpagina op basis van een brief. Gebruikt brand-, SEO- en templateregels automatisch. Geef templateCode mee (bv. T01) wanneer een klantspecifieke paginastructuur uit templates/-map gebruikt moet worden.',",
     '    schema: z.object({',
-    "      brief:    z.string().describe('Schrijfopdracht of geconsolideerde brief'),",
-    "      pageType: z.enum(['dienstpagina','productpagina','artikelpagina','case','social proof snippet','overig']),",
-    "      url:      z.string().describe('Toekomstige URL van de pagina'),",
-    "      keywords: z.string().describe('Zoekwoorden, kommagescheiden — mag leeg zijn voor case/social proof')",
+    "      brief:        z.string().describe('Schrijfopdracht of geconsolideerde brief'),",
+    "      pageType:     z.enum(['dienstpagina','productpagina','artikelpagina','case','social proof snippet','overig']),",
+    "      url:          z.string().describe('Toekomstige URL van de pagina'),",
+    "      keywords:     z.string().describe('Zoekwoorden, kommagescheiden — mag leeg zijn voor case/social proof'),",
+    "      templateCode: z.string().nullable().optional().describe('Optionele klantspecifieke template-code uit de SEO-strategie (T01, T02, ...). Laat leeg voor generieke paginatypen.')",
     '    })',
     '  }',
     ');',
@@ -5190,6 +5216,7 @@ function lcGenToolLoadKnowledge() {
     '',
     '// process.cwd() = projectroot in Vercel; __dirname werkt niet betrouwbaar in ESM-functies',
     "const KNOWLEDGE_DIR = join(process.cwd(), 'knowledge');",
+    "const TEMPLATES_DIR = join(process.cwd(), 'templates');",
     '',
     'export async function readKnowledge() {',
     '  const read = name => {',
@@ -5197,6 +5224,27 @@ function lcGenToolLoadKnowledge() {
     "    catch { return '# ' + name + '.md\\n_Bestand niet gevonden_'; }",
     '  };',
     '  return { brand: read(\'brand\'), seo: read(\'seo\'), templates: read(\'templates\'), knowledge: read(\'knowledge\') };',
+    '}',
+    '',
+    '// Klantspecifieke template uit templates/Tnn.md (parsedSheet-derived).',
+    '// Retourneert null als bestand niet bestaat — caller mag dan terugvallen op templates.md.',
+    'export function readTemplate(code) {',
+    '  if (!code || !/^T\\d+/i.test(String(code))) return null;',
+    '  try { return readFileSync(join(TEMPLATES_DIR, code + \'.md\'), \'utf8\'); }',
+    '  catch { return null; }',
+    '}',
+    '',
+    '// Briefing voor één URL uit knowledge/briefings.md (parsedSheet-derived).',
+    '// Retourneert de tekst van de H2-sectie, of null als URL niet voorkomt.',
+    'export function readBriefing(url) {',
+    '  if (!url) return null;',
+    '  try {',
+    "    const all = readFileSync(join(KNOWLEDGE_DIR, 'briefings.md'), 'utf8');",
+    "    const escaped = url.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');",
+    "    const re = new RegExp('## ' + escaped + '\\\\n([\\\\s\\\\S]*?)(?=\\\\n## |$)');",
+    '    const m = all.match(re);',
+    '    return m ? m[1].trim() : null;',
+    '  } catch { return null; }',
     '}',
     '',
     'export const loadKnowledgeTool = tool(',
@@ -6711,11 +6759,15 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     lastPage = null;
     lastVerdict = null;
 
+    // Als een briefing is geladen: stuur templateCode mee zodat de agent
+    // templates/Tnn.md kan inlezen voor klantspecifieke paginastructuur.
+    const templateCode = activeBriefing && activeBriefing.template ? activeBriefing.template : null;
+
     try {
       const res = await fetch('/api/agent', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ url, pageType: pagetypeValue, keywords, brief, sources, style: styleValue }),
+        body: JSON.stringify({ url, pageType: pagetypeValue, keywords, brief, sources, style: styleValue, templateCode }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Onbekende fout');
