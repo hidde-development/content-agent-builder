@@ -1742,12 +1742,47 @@ async function handleSheetUpload(file) {
     status.textContent = '✓ Sheet ingelezen: ' + file.name;
     renderSheetPreview(parsedSheet);
     preview.style.display = 'block';
+
+    // Auto-fill Hoofdpagina's-veld als nog leeg: sheet bevat de bewust-gekozen
+    // navigatie-structuur (Level 0+1). Beter dan een rommelige sitemap.xml.
+    applySheetMainUrls(false);
   } catch (err) {
     parsedSheet = null;
     status.className = 'analyse-status error';
     status.textContent = '✗ Kon de sheet niet inlezen: ' + (err && err.message ? err.message : err);
     preview.style.display = 'none';
   }
+}
+
+// Filter URLs uit de sheet op slug-diepte: 0 = root, 1 = hoofdcategorie.
+// Standaard tot Level 1 = de echte 'hoofdpagina's' van de site.
+function extractMainUrlsFromSheet(maxDepth) {
+  if (typeof maxDepth !== 'number') maxDepth = 1;
+  if (!parsedSheet || !parsedSheet.sitestructuur || parsedSheet.sitestructuur.error) return [];
+  const pages = parsedSheet.sitestructuur.pages.filter(p => p.url);
+  return pages
+    .filter(p => {
+      const trimmed = p.url.replace(/\/+$/, '');
+      const parts = trimmed.split('/');
+      // https://x.nl → 3 parts (depth 0); https://x.nl/y → 4 parts (depth 1)
+      const depth = Math.max(0, parts.length - 3);
+      return depth <= maxDepth;
+    })
+    .map(p => p.url);
+}
+
+// Vul Hoofdpagina's-textarea met sheet-URLs.
+// force=false: alleen als textarea leeg is. force=true: altijd overschrijven.
+function applySheetMainUrls(force) {
+  const textarea = document.getElementById('SITEMAP_URLS');
+  if (!textarea) return false;
+  if (!force && textarea.value.trim()) return false;
+  const urls = extractMainUrlsFromSheet(1);
+  if (!urls.length) return false;
+  textarea.value = urls.join('\n');
+  textarea.classList.add('ai-filled');
+  if (typeof updateProgress === 'function') updateProgress();
+  return true;
 }
 
 function clearParsedSheet() {
@@ -2088,7 +2123,16 @@ function renderSheetPreview(p) {
     html += '</div></div>';
   }
 
-  html += '<div style="margin-top:12px"><button type="button" class="sheet-clear-btn" onclick="clearParsedSheet()">Sheet verwijderen</button></div>';
+  // Sheet-acties: hoofdpagina's overnemen + sheet wissen
+  const mainUrlCount = (p.sitestructuur && !p.sitestructuur.error)
+    ? extractMainUrlsFromSheet(1).length
+    : 0;
+  html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
+  if (mainUrlCount) {
+    html += '<button type="button" class="sheet-clear-btn" onclick="applySheetMainUrls(true)" title="Vervang het Hoofdpagina-veld met ' + mainUrlCount + ' URLs uit deze sheet (Level 0 + 1)">Hoofdpagina&rsquo;s overnemen (' + mainUrlCount + ')</button>';
+  }
+  html += '<button type="button" class="sheet-clear-btn" onclick="clearParsedSheet()">Sheet verwijderen</button>';
+  html += '</div>';
 
   wrap.innerHTML = html;
 }
