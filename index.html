@@ -2795,7 +2795,7 @@ function generateSetupMd() {
   const brandFiles = uploadedFiles.filter(f => !f.name.toLowerCase().endsWith('.xml'));
   const hasSheet = !!(parsedSheet && parsedSheet.sitestructuur && parsedSheet.sitestructuur.pages && parsedSheet.sitestructuur.pages.length);
   const sheetFilesNote = hasSheet
-    ? `\n\nExtra (uit SEO-strategie sheet):\n- \`knowledge/briefings.md\` — per-pagina briefings\n- \`knowledge/site-architectuur.md\` — URL-hiërarchie\n${parsedSheet.redirects && !parsedSheet.redirects.error ? '- `knowledge/redirects.md` — oude → nieuwe URL-mapping\n' : ''}${parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length ? '- `knowledge/entiteiten.md` — verplichte termen\n' : ''}${parsedSheet.templates && parsedSheet.templates.length ? `- \`templates/T01.md\`, \`T02.md\`, … — klantspecifieke paginastructuren (${parsedSheet.templates.length} stuks)\n` : ''}`
+    ? `\n\nExtra (uit SEO-strategie sheet):\n- \`knowledge/briefings.md\` — per-pagina briefings\n${parsedSheet.templates && parsedSheet.templates.length ? `- \`templates/T01.md\`, \`T02.md\`, … — klantspecifieke paginastructuren (${parsedSheet.templates.length} stuks)\n` : ''}`
     : '';
   return `# Installatie — ${client} Content Agent
 
@@ -2876,7 +2876,7 @@ function generateSystemPromptMd() {
   }
 
   const sheetBronnenNote = hasSheet
-    ? `\n\n## Sheet-data (per-pagina briefings)\n\nKlant heeft een SEO-strategie sheet aangeleverd. Naast de algemene kennisbijlagen ook beschikbaar:\n- \`knowledge/briefings.md\` — per toekomstige URL: template, keywords, parent, consolidatiebronnen\n- \`knowledge/site-architectuur.md\` — URL-hiërarchie met parents en kinderen\n${parsedSheet.redirects && !parsedSheet.redirects.error ? '- `knowledge/redirects.md` — oude → nieuwe URL-mapping\n' : ''}${hasSheetEntiteiten ? '- `knowledge/entiteiten.md` — verplichte brede termen (≥2-3 per pagina)\n' : ''}${hasSheetTemplates ? '- `templates/T01.md`, `T02.md`, … — klantspecifieke paginastructuren\n' : ''}\nWERKWIJZE bij opdracht "schrijf pagina [URL]":\n1. Zoek de URL in briefings.md → gebruik die briefing als intake (skip handmatige intake-vragen).\n2. Pak de gekoppelde Template uit templates/. Geen template? Val terug op templates.md.\n3. Bij ≥2 bronnen in briefing: activeer consolidatiemodus.\n4. Voor interne linking: gebruik site-architectuur.md (parent + kinderen) en redirects.md (oude URL's vermijden).`
+    ? `\n\n## Sheet-data (per-pagina briefings)\n\nKlant heeft een SEO-strategie sheet aangeleverd. Beschikbaar:\n- \`knowledge/briefings.md\` — per toekomstige URL: template, keywords, parent, kinderen, consolidatiebronnen\n${hasSheetTemplates ? '- `templates/T01.md`, `T02.md`, … — klantspecifieke paginastructuren\n' : ''}\nWERKWIJZE bij opdracht "schrijf pagina [URL]":\n1. Zoek de URL in briefings.md → gebruik als intake (skip handmatige intake-vragen).\n2. Pak gekoppelde Template uit templates/. Geen template? Val terug op templates.md.\n3. ≥2 bronnen in briefing: activeer consolidatiemodus.\n4. Interne linking: parent + kinderen uit briefing.`
     : '';
 
   const bronnenNote = extraKnowledgeFiles.length
@@ -3416,20 +3416,12 @@ function pageParent(url) {
   return parts.slice(0, -1).join('/');
 }
 
-function generateSheetSiteArchitectureMd() {
+function generateSheetBriefingsMd() {
   if (!parsedSheet || !parsedSheet.sitestructuur || parsedSheet.sitestructuur.error) return null;
   const pages = parsedSheet.sitestructuur.pages.filter(p => p.url);
   if (!pages.length) return null;
 
-  const lines = [
-    '# Site-architectuur',
-    '',
-    `${pages.length} toekomstige pagina's. Per pagina: template, parent, directe kinderen.`,
-    'Gebruik dit voor interne linking: parent als bovenliggende pagina, kinderen als clusterlinks.',
-    ''
-  ];
-
-  // Index parent → children
+  // Index parent → directe kinderen voor cluster-info per pagina
   const childMap = new Map();
   for (const p of pages) {
     const parent = pageParent(p.url);
@@ -3437,32 +3429,12 @@ function generateSheetSiteArchitectureMd() {
     childMap.get(parent).push(p.url);
   }
 
-  for (const p of pages) {
-    const url = p.url;
-    const parent = pageParent(url);
-    const myUrlTrim = url.replace(/\/$/, '');
-    const directChildren = (childMap.get(myUrlTrim) || []);
-
-    lines.push(`## ${url}`);
-    if (p.template) lines.push(`Template: ${p.template}`);
-    lines.push(`Parent: ${parent}`);
-    if (directChildren.length) lines.push(`Kinderen (${directChildren.length}): ${directChildren.join(', ')}`);
-    if (p.opmerking) lines.push(`Opmerking: ${p.opmerking}`);
-    lines.push('');
-  }
-  return lines.join('\n');
-}
-
-function generateSheetBriefingsMd() {
-  if (!parsedSheet || !parsedSheet.sitestructuur || parsedSheet.sitestructuur.error) return null;
-  const pages = parsedSheet.sitestructuur.pages.filter(p => p.url);
-  if (!pages.length) return null;
-
   const lines = [
     '# Pagina-briefings',
     '',
-    `Per toekomstige URL: template, keywords (gesorteerd op volume), parent, bronnen voor consolidatie. ${pages.length} pagina's.`,
+    `Per toekomstige URL: template, keywords (gesorteerd op volume), parent, kinderen, consolidatiebronnen. ${pages.length} pagina's.`,
     'Bij opdracht "schrijf pagina X": zoek hier op URL, gebruik deze briefing als intake-input.',
+    'Voor interne linking: gebruik parent als bovenliggende pagina, kinderen als clusterlinks.',
     ''
   ];
 
@@ -3471,6 +3443,10 @@ function generateSheetBriefingsMd() {
     if (p.template) lines.push(`Template: ${p.template}`);
     const parent = pageParent(p.url);
     if (parent && parent !== '(homepage)') lines.push(`Parent: ${parent}`);
+
+    const myUrlTrim = p.url.replace(/\/$/, '');
+    const kids = childMap.get(myUrlTrim) || [];
+    if (kids.length) lines.push(`Kinderen (${kids.length}): ${kids.join(', ')}`);
 
     if (p.keywords && p.keywords.length) {
       const sorted = [...p.keywords].sort((a, b) => (b.volume || 0) - (a.volume || 0));
@@ -3499,40 +3475,6 @@ function generateSheetBriefingsMd() {
   return lines.join('\n');
 }
 
-function generateSheetRedirectsMd() {
-  if (!parsedSheet || !parsedSheet.redirects || parsedSheet.redirects.error) return null;
-  const r = parsedSheet.redirects;
-
-  const dupSet = new Set(r.duplicates.map(d => d.url));
-  const selfSet = new Set(r.selfRefs.map(e => e.oud));
-
-  const valid = r.entries.filter(e => e.oud && !dupSet.has(e.oud) && !selfSet.has(e.oud));
-  if (!valid.length) return null;
-
-  const lines = [
-    '# Redirect-map',
-    '',
-    `${valid.length} geldige migraties uit oude site → nieuwe site. Format: oud → nieuw.`,
-    'Gebruik bij interne linking: linkt een interne tekst naar een oude URL? Vervang door de nieuwe.',
-    'URL niet in lijst en ook niet in site-architectuur.md? Niet linken.',
-    '',
-    '## Migraties',
-    ''
-  ];
-
-  for (const e of valid) {
-    lines.push(`- ${e.oud} → ${e.nieuw}`);
-  }
-
-  if (r.duplicates.length || r.selfRefs.length) {
-    lines.push('');
-    lines.push('## Validatie-issues (uit te sluiten)');
-    lines.push('');
-    if (r.duplicates.length) lines.push(`${r.duplicates.length} dubbele oude URL's — één URL kan niet naar meerdere plekken redirecten.`);
-    if (r.selfRefs.length) lines.push(`${r.selfRefs.length} self-redirects — URL verwijst naar zichzelf.`);
-  }
-  return lines.join('\n');
-}
 
 // ── Sitemap parser ────────────────────────────────────────────────────────
 let parsedSitemapData = null; // { navUrls, productUrls, clusters, allUrls }
@@ -3794,38 +3736,20 @@ async function _doDownloadCustomAgent() {
     zip.file('templates.md',     generateTemplatesMd());
     zip.file('knowledge.md',     generateKnowledgeMd());
 
-    // Sheet-derived bestanden (Fase 2a) — alleen als parsedSheet aanwezig
+    // Sheet-derived bestanden (Fase 2) — alleen als parsedSheet aanwezig
+    // Custom GPT = pure content-machine: alleen schrijf-essentiele files.
+    // Redirects/site-arch/losse entiteiten zijn technische ruis voor dit doel.
     if (parsedSheet) {
-      // Eén MD per template
+      // Eén MD per klantspecifieke template
       if (parsedSheet.templates && parsedSheet.templates.length) {
         for (const t of parsedSheet.templates) {
           zip.file(`templates/${t.code}.md`, generateSheetTemplateMd(t));
         }
       }
-      // Site-architectuur
-      const archMd = generateSheetSiteArchitectureMd();
-      if (archMd) zip.file('knowledge/site-architectuur.md', archMd);
-
-      // Per-pagina briefings
+      // Per-pagina briefings (bevat parent + kinderen + keywords + bronnen)
       const briefMd = generateSheetBriefingsMd();
       if (briefMd) zip.file('knowledge/briefings.md', briefMd);
-
-      // Redirect-map
-      const redirMd = generateSheetRedirectsMd();
-      if (redirMd) zip.file('knowledge/redirects.md', redirMd);
-
-      // Entiteiten als verplichte termen — bewaar als losse referentie
-      if (parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length) {
-        const entLines = [
-          '# Verplichte entiteiten',
-          '',
-          `${parsedSheet.entiteiten.terms.length} brede termen. Verwerk minimaal 2-3 per pagina, natuurlijk, niet gestapeld.`,
-          'Doel: merknaam koppelen aan deze begrippen in AI-zoekresultaten (AEO/GEO).',
-          '',
-          ...parsedSheet.entiteiten.terms.map(t => `- ${t}`)
-        ];
-        zip.file('knowledge/entiteiten.md', entLines.join('\n'));
-      }
+      // Entiteiten zitten in brand.md, redirects/site-arch zijn infra (niet voor schrijver).
     }
 
     // Include custom template if uploaded
