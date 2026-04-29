@@ -4445,7 +4445,7 @@ const rootDir = path.resolve(__dirname, '..');
 
 const ACTIVE_DOMAIN_CRITICS = ${activeDomains};
 
-const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-sonnet-4-6', maxTokens: 2048, topP: 1 });
+const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-sonnet-4-6', maxTokens: 2048, topP: undefined });
 ${domainLoad}
 function parseJson(raw) {
   if (typeof raw !== 'string') raw = String(raw || '');
@@ -4907,7 +4907,7 @@ function lcGenLibAgent(migration = false) {
     '  apiKey: process.env.Claude,',
     "  model: 'claude-sonnet-4-6',",
     '  maxTokens: 4096,',
-    '  topP: 1,',
+    '  topP: undefined,',
     '});',
     '',
   );
@@ -5094,7 +5094,7 @@ function lcGenToolConsolidate() {
     "import { z } from 'zod';",
     "import { ChatAnthropic } from '@langchain/anthropic';",
     '',
-    'const model = new ChatAnthropic({ apiKey: process.env.Claude, model: \'claude-sonnet-4-6\', maxTokens: 2048, topP: 1 });',
+    'const model = new ChatAnthropic({ apiKey: process.env.Claude, model: \'claude-sonnet-4-6\', maxTokens: 2048, topP: undefined });',
     '',
     'export const consolidateTool = tool(',
     '  async ({ sources, topic }) => {',
@@ -5141,7 +5141,7 @@ function lcGenToolWritePage() {
     "import { ChatAnthropic } from '@langchain/anthropic';",
     "import { readKnowledge, readTemplate, readBriefing } from './load-knowledge.js';",
     '',
-    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-sonnet-4-6', maxTokens: 4096, topP: 1 });",
+    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-sonnet-4-6', maxTokens: 4096, topP: undefined });",
     '',
     'export const writePageTool = tool(',
     '  async ({ brief, pageType, url, keywords, templateCode = null }) => {',
@@ -5208,7 +5208,7 @@ function lcGenToolValidate() {
     "import { ChatAnthropic } from '@langchain/anthropic';",
     "import { readKnowledge } from './load-knowledge.js';",
     '',
-    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-haiku-4-5-20251001', maxTokens: 1024, topP: 1 });",
+    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-haiku-4-5-20251001', maxTokens: 1024, topP: undefined });",
     '',
     'export const validateTool = tool(',
     '  async ({ content, pageType = "overig" }) => {',
@@ -5508,7 +5508,7 @@ function lcGenToolMapRedirects() {
     "import { z } from 'zod';",
     "import { ChatAnthropic } from '@langchain/anthropic';",
     '',
-    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-haiku-4-5-20251001', maxTokens: 4096, topP: 1 });",
+    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-haiku-4-5-20251001', maxTokens: 4096, topP: undefined });",
     '',
     'export const mapRedirectsTool = tool(',
     '  async ({ oldUrls, newUrls }) => {',
@@ -5896,7 +5896,7 @@ function lcGenApiRedirects(format) {
     '  return true;',
     '}',
     '',
-    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-haiku-4-5-20251001', maxTokens: 4096, topP: 1 });",
+    "const model = new ChatAnthropic({ apiKey: process.env.Claude, model: 'claude-haiku-4-5-20251001', maxTokens: 4096, topP: undefined });",
     '',
     'async function mapUrls(oldUrls, newUrls) {',
     '  const batchSize = 50;',
