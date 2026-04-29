@@ -3416,6 +3416,41 @@ function pageParent(url) {
   return parts.slice(0, -1).join('/');
 }
 
+// Compacte representatie van de sheet voor de gegenereerde LangChain-frontend.
+// Wordt inline in index.html gestopt als window.__SHEET_PAGES__.
+function buildSheetPagesForFrontend(p) {
+  if (!p || !p.sitestructuur || p.sitestructuur.error) return null;
+  const pages = p.sitestructuur.pages.filter(pg => pg.url);
+  if (!pages.length) return null;
+
+  const childMap = new Map();
+  for (const pg of pages) {
+    const parent = pageParent(pg.url);
+    if (!childMap.has(parent)) childMap.set(parent, []);
+    childMap.get(parent).push(pg.url);
+  }
+
+  return pages.map(pg => {
+    const sorted = [...(pg.keywords || [])].sort((a, b) => (b.volume || 0) - (a.volume || 0));
+    const primair = sorted[0] ? sorted[0].term : '';
+    const secundair = sorted.slice(1, 4).map(k => k.term);
+    const longtail = sorted.slice(4, 12).map(k => k.term);
+    const myUrlTrim = pg.url.replace(/\/$/, '');
+    const kinderen = childMap.get(myUrlTrim) || [];
+    return {
+      url: pg.url,
+      template: pg.template || '',
+      parent: pageParent(pg.url),
+      kinderen,
+      primair,
+      secundair,
+      longtail,
+      bronnen: (pg.huidigeLinks || []).slice(0, 30),
+      opmerking: pg.opmerking || ''
+    };
+  });
+}
+
 function generateSheetBriefingsMd() {
   if (!parsedSheet || !parsedSheet.sitestructuur || parsedSheet.sitestructuur.error) return null;
   const pages = parsedSheet.sitestructuur.pages.filter(p => p.url);
@@ -6017,6 +6052,11 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   const domainCritics = Array.isArray(reviewConfig.domainCritics) ? reviewConfig.domainCritics : [];
   const domainLabels = { legal: 'Juridisch', medical: 'Medisch', financial: 'Financieel', claims: 'Claims' };
 
+  // Sheet-data embedden voor live briefing-loading in de frontend
+  const sheetPages = buildSheetPagesForFrontend(parsedSheet);
+  const sheetPagesJsLiteral = sheetPages ? JSON.stringify(sheetPages) : 'null';
+  const sheetCount = sheetPages ? sheetPages.length : 0;
+
   const navMigTab    = mig ? `<button class="nav-tab" onclick="switchTab('migratie')">Migratie</button>` : '';
   const migTabPanel  = mig ? lcGenFrontendMigratieTab(base, cmsLabel, hasCms) : '';
   const apiMigRows   = mig ? lcGenFrontendApiMig(hasCms) : '';
@@ -6174,6 +6214,27 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     .form-row textarea.mono { font-family: monospace; font-size: 13px; }
 
     .btn-group-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .sheet-picker-row input { font-family: 'Epilogue', Calibri, sans-serif; }
+    .briefing-panel {
+      background: linear-gradient(135deg, rgba(238,233,255,0.55) 0%, rgba(226,219,255,0.4) 100%);
+      border: 1px solid rgba(99,49,244,0.2);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      font-size: 13.5px;
+      color: var(--dark-grey);
+    }
+    .briefing-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .briefing-title { font-weight: 600; color: var(--purple-deep); font-size: 13px; letter-spacing: 0.02em; text-transform: uppercase; }
+    .briefing-clear {
+      background: none; border: 1px solid rgba(99,49,244,0.3); color: var(--purple-deep);
+      padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit;
+    }
+    .briefing-clear:hover { background: rgba(99,49,244,0.1); }
+    .briefing-body > div { padding: 4px 0; line-height: 1.55; }
+    .briefing-body strong { color: var(--near-black); font-weight: 600; min-width: 110px; display: inline-block; }
+    .briefing-body code { background: rgba(255,255,255,0.6); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
     .btn-opt {
       padding: 10px 18px; border: 1px solid rgba(220, 224, 230, 0.8); border-radius: 10px;
       font-size: 13px; font-weight: 600; cursor: pointer; background: white;
@@ -6379,6 +6440,21 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         <strong>Gebruik dit voor:</strong> het schrijven van nieuwe dienst-, product- of artikelpagina's, cases en social proof snippets. De agent raadpleegt altijd eerst de kennisbank.
       </div>
 
+      <div class="form-row sheet-picker-row" id="sheet-picker-row" style="display:none">
+        <label>Kies pagina uit SEO-strategie <span style="font-weight:400;color:var(--mid-grey);text-transform:none;letter-spacing:normal">(${sheetCount} pagina's)</span></label>
+        <div class="hint">Begin te typen om te zoeken. Bij selectie worden URL, keywords, bronnen en context automatisch ingevuld.</div>
+        <input type="text" id="w-sheet-search" list="sheet-urls" placeholder="bv. /letselschade — typ deel van URL of zoekwoord" oninput="loadSheetBriefing()" autocomplete="off" />
+        <datalist id="sheet-urls"></datalist>
+      </div>
+
+      <div class="briefing-panel" id="briefing-panel" style="display:none">
+        <div class="briefing-head">
+          <span class="briefing-title">Briefing geladen</span>
+          <button class="briefing-clear" onclick="clearBriefing()">Wissen</button>
+        </div>
+        <div class="briefing-body" id="briefing-body"></div>
+      </div>
+
       <div class="form-row">
         <label>Paginatype</label>
         <div class="btn-group-row" id="pagetype-group">
@@ -6470,6 +6546,9 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
 </main>
 
 <script>
+  // Sheet-data uit SEO-strategie (null als geen sheet bij build)
+  window.__SHEET_PAGES__ = ${sheetPagesJsLiteral};
+
   let pagetypeValue = 'dienstpagina';
   let styleValue = 'feitelijk';
   let migratePagetype = 'dienstpagina';
@@ -6478,6 +6557,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   let bulkRunning = false;
   let lastPage = null;
   let lastVerdict = null;
+  let activeBriefing = null;
 
   function authHeaders() {
     const key = document.getElementById('api-key-input').value.trim();
@@ -6533,6 +6613,86 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   function copyOutput(id) {
     navigator.clipboard.writeText(document.getElementById(id).textContent);
   }
+
+  // ── Sheet-picker: autocomplete + briefing-load ──
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function initSheetPicker() {
+    const pages = window.__SHEET_PAGES__;
+    if (!pages || !pages.length) return;
+    document.getElementById('sheet-picker-row').style.display = '';
+    const dl = document.getElementById('sheet-urls');
+    dl.innerHTML = pages.map(p => {
+      const label = p.template
+        ? p.url + ' — ' + p.template + (p.primair ? ' (' + p.primair + ')' : '')
+        : p.url;
+      return '<option value="' + escHtml(p.url) + '">' + escHtml(label) + '</option>';
+    }).join('');
+  }
+
+  function findSheetPage(query) {
+    const pages = window.__SHEET_PAGES__;
+    if (!pages) return null;
+    const q = String(query || '').trim();
+    if (!q) return null;
+    // Alleen exacte URL-match: de datalist zorgt voor selectie. Geen substring,
+    // anders flikkert de briefing tijdens typen.
+    return pages.find(p => p.url === q) || null;
+  }
+
+  function loadSheetBriefing() {
+    const search = document.getElementById('w-sheet-search');
+    const page = findSheetPage(search.value);
+    if (!page) return; // wacht tot gebruiker een match selecteert
+    if (activeBriefing && activeBriefing.url === page.url) return;
+
+    activeBriefing = page;
+
+    // Velden invullen
+    document.getElementById('w-url').value = page.url;
+    const allKeywords = [page.primair, ...page.secundair, ...page.longtail].filter(Boolean);
+    document.getElementById('w-keywords').value = allKeywords.join(', ');
+    document.getElementById('w-sources').value = page.bronnen.join('\\n');
+
+    // Brief-veld vullen met context die de agent niet uit de kennisbank weet
+    const briefParts = [];
+    if (page.template) briefParts.push('Template: ' + page.template);
+    if (page.parent && page.parent !== '(homepage)') briefParts.push('Parent: ' + page.parent);
+    if (page.kinderen.length) briefParts.push('Cluster (kinderen): ' + page.kinderen.slice(0, 6).join(', ') + (page.kinderen.length > 6 ? ' …' : ''));
+    if (page.opmerking) briefParts.push('Strategische opmerking: ' + page.opmerking);
+    if (page.bronnen.length >= 2) briefParts.push('Consolidatiemodus: ' + page.bronnen.length + ' bronnen worden samengevoegd.');
+    document.getElementById('w-brief').value = briefParts.join('\\n');
+
+    // Briefing-paneel tonen
+    const panel = document.getElementById('briefing-panel');
+    const body = document.getElementById('briefing-body');
+    body.innerHTML = ''
+      + (page.template ? '<div><strong>Template:</strong> <code>' + escHtml(page.template) + '</code></div>' : '')
+      + '<div><strong>Primair:</strong> ' + escHtml(page.primair || '(geen)') + '</div>'
+      + (page.secundair.length ? '<div><strong>Secundair:</strong> ' + escHtml(page.secundair.join(', ')) + '</div>' : '')
+      + (page.longtail.length ? '<div><strong>Long-tail:</strong> ' + escHtml(page.longtail.join(', ')) + '</div>' : '')
+      + (page.parent && page.parent !== '(homepage)' ? '<div><strong>Parent:</strong> ' + escHtml(page.parent) + '</div>' : '')
+      + (page.kinderen.length ? '<div><strong>Kinderen:</strong> ' + page.kinderen.length + ' pagina\\'s</div>' : '')
+      + (page.bronnen.length ? '<div><strong>Bronnen:</strong> ' + page.bronnen.length + ' (consolidatie)</div>' : '')
+      + (page.opmerking ? '<div><strong>Opmerking:</strong> ' + escHtml(page.opmerking) + '</div>' : '');
+    panel.style.display = '';
+  }
+
+  function clearBriefing() {
+    activeBriefing = null;
+    document.getElementById('briefing-panel').style.display = 'none';
+    document.getElementById('w-sheet-search').value = '';
+    document.getElementById('w-url').value = '';
+    document.getElementById('w-keywords').value = '';
+    document.getElementById('w-brief').value = '';
+    document.getElementById('w-sources').value = '';
+  }
+
+  // Init bij DOMContentLoaded (script staat onderaan, dus DOM is al klaar)
+  initSheetPicker();
 
   async function schrijfPagina(btn) {
     const url = document.getElementById('w-url').value.trim();
