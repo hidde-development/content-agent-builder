@@ -57,6 +57,13 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Alleen http(s) URLs zijn toegestaan.' });
   }
 
+  // Blokkeer private/loopback IP-ranges (SSRF-preventie).
+  const hostname = target.hostname;
+  const privatePattern = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|169\.254\.|::1$|localhost$)/i;
+  if (privatePattern.test(hostname)) {
+    return res.status(400).json({ error: 'Interne of lokale adressen zijn niet toegestaan.' });
+  }
+
   const origin = target.origin;
   const isRobotsTxt = /robots\.txt$/i.test(target.pathname);
   const isXml = /\.xml$/i.test(target.pathname);

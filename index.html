@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Content Agent Prompt Builder — Goldfizh</title>
   <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" integrity="sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <style>
     :root {
       --purple:          #6331F4;
@@ -1307,12 +1307,17 @@
     <div class="section-label"><div class="section-square"></div><span>Intakevragen per paginatype</span></div>
     <div class="hint" style="margin-bottom:20px">De agent stelt deze vragen vóór het schrijven van elke pagina — aanvullend op de standaard intake. De standaardvragen zijn al ingevuld; pas ze aan voor specifieke klanten of voeg eigen vragen toe. Eén vraag per regel.</div>
 
-    <div class="btn-group" style="margin-bottom:16px" id="intake-tabs">
+    <div class="btn-group" style="margin-bottom:16px;flex-wrap:wrap" id="intake-tabs">
       <button class="btn-option selected" onclick="switchIntakeTab('dienstpagina')">Dienstpagina</button>
       <button class="btn-option" onclick="switchIntakeTab('productpagina')">Productpagina</button>
       <button class="btn-option" onclick="switchIntakeTab('artikelpagina')">Artikelpagina</button>
       <button class="btn-option" onclick="switchIntakeTab('case')">Case</button>
       <button class="btn-option" onclick="switchIntakeTab('social-proof')">Social proof</button>
+      <button class="btn-option" onclick="switchIntakeTab('social-b2c')">Social B2C</button>
+      <button class="btn-option" onclick="switchIntakeTab('social-video-b2c')">TikTok</button>
+      <button class="btn-option" onclick="switchIntakeTab('social-b2b')">LinkedIn</button>
+      <button class="btn-option" onclick="switchIntakeTab('landingspagina-ecommerce')">Landing e-com</button>
+      <button class="btn-option" onclick="switchIntakeTab('nieuwsbrief')">Nieuwsbrief</button>
     </div>
 
     <div id="intake-panel-dienstpagina" class="intake-panel">
@@ -1329,6 +1334,21 @@
     </div>
     <div id="intake-panel-social-proof" class="intake-panel" style="display:none">
       <textarea id="intake-vragen-social-proof" rows="4" style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--light-grey);border-radius:8px;resize:vertical;color:var(--near-black);line-height:1.7"></textarea>
+    </div>
+    <div id="intake-panel-social-b2c" class="intake-panel" style="display:none">
+      <textarea id="intake-vragen-social-b2c" rows="4" style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--light-grey);border-radius:8px;resize:vertical;color:var(--near-black);line-height:1.7"></textarea>
+    </div>
+    <div id="intake-panel-social-video-b2c" class="intake-panel" style="display:none">
+      <textarea id="intake-vragen-social-video-b2c" rows="4" style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--light-grey);border-radius:8px;resize:vertical;color:var(--near-black);line-height:1.7"></textarea>
+    </div>
+    <div id="intake-panel-social-b2b" class="intake-panel" style="display:none">
+      <textarea id="intake-vragen-social-b2b" rows="4" style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--light-grey);border-radius:8px;resize:vertical;color:var(--near-black);line-height:1.7"></textarea>
+    </div>
+    <div id="intake-panel-landingspagina-ecommerce" class="intake-panel" style="display:none">
+      <textarea id="intake-vragen-landingspagina-ecommerce" rows="5" style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--light-grey);border-radius:8px;resize:vertical;color:var(--near-black);line-height:1.7"></textarea>
+    </div>
+    <div id="intake-panel-nieuwsbrief" class="intake-panel" style="display:none">
+      <textarea id="intake-vragen-nieuwsbrief" rows="5" style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--light-grey);border-radius:8px;resize:vertical;color:var(--near-black);line-height:1.7"></textarea>
     </div>
   </div>
 
@@ -1452,6 +1472,9 @@
         <p style="font-size:13px;color:var(--mid-grey);margin-bottom:16px;line-height:1.5">
           De ZIP bevat een werkende LangChain agent met 6 content-tools (+ 7 migratie-tools indien ingeschakeld), review-pipeline, Vercel API-endpoints en alle gegenereerde kennisbestanden. Deploy in je eigen Vercel-project.
         </p>
+        <div style="background:#FFF8E1;border:1px solid #F59E0B;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#92400E;line-height:1.5">
+          <strong>⚠ Beveiliging:</strong> stel na het deployen <code>AGENT_API_KEY</code> in als Vercel-omgevingsvariabele. Zonder deze waarde zijn alle API-endpoints publiek toegankelijk zonder authenticatie.
+        </div>
         <button class="btn-generate" style="width:100%" onclick="confirmLangChainDownload()">
           ↓ Genereer &amp; download LangChain Agent
         </button>
@@ -1746,6 +1769,8 @@ async function handleSheetUpload(file) {
     // Auto-fill Hoofdpagina's-veld als nog leeg: sheet bevat de bewust-gekozen
     // navigatie-structuur (Level 0+1). Beter dan een rommelige sitemap.xml.
     applySheetMainUrls(false);
+    // Auto-fill merktermen met entiteiten uit de ENTITEITEN-tab van de sheet.
+    applySheetEntiteiten(false);
   } catch (err) {
     parsedSheet = null;
     status.className = 'analyse-status error';
@@ -1781,6 +1806,19 @@ function applySheetMainUrls(force) {
   if (!urls.length) return false;
   textarea.value = urls.join('\n');
   textarea.classList.add('ai-filled');
+  if (typeof updateProgress === 'function') updateProgress();
+  return true;
+}
+
+// Vul de paired-merktermen-lijst met entiteiten uit de sheet.
+// force=false: alleen als het veld nog leeg is. force=true: altijd overschrijven.
+function applySheetEntiteiten(force) {
+  if (!parsedSheet || !parsedSheet.entiteiten || !parsedSheet.entiteiten.terms.length) return false;
+  const existing = getPaired('merktermen');
+  if (!force && existing.some(m => m.naam && m.naam.trim())) return false;
+  pairedData['merktermen'] = parsedSheet.entiteiten.terms.map(t => ({ naam: t, desc: '', url: '' }));
+  renderPaired('merktermen');
+  updateMerktermenWarning();
   if (typeof updateProgress === 'function') updateProgress();
   return true;
 }
@@ -2131,6 +2169,9 @@ function renderSheetPreview(p) {
   if (mainUrlCount) {
     html += '<button type="button" class="sheet-clear-btn" onclick="applySheetMainUrls(true)" title="Vervang het Hoofdpagina-veld met ' + mainUrlCount + ' URLs uit deze sheet (Level 0 + 1)">Hoofdpagina&rsquo;s overnemen (' + mainUrlCount + ')</button>';
   }
+  if (p.entiteiten && p.entiteiten.terms.length) {
+    html += '<button type="button" class="sheet-clear-btn" onclick="applySheetEntiteiten(true)" title="Vervang de merktermen-lijst met ' + p.entiteiten.terms.length + ' entiteiten uit de ENTITEITEN-tab">Entiteiten overnemen (' + p.entiteiten.terms.length + ')</button>';
+  }
   html += '<button type="button" class="sheet-clear-btn" onclick="clearParsedSheet()">Sheet verwijderen</button>';
   html += '</div>';
 
@@ -2285,7 +2326,7 @@ function applyFields(fields) {
 
   // Intakevragen per paginatype — overschrijf defaults als document eigen vragen heeft
   if (fields.intakevragen && typeof fields.intakevragen === 'object') {
-    ['dienstpagina', 'productpagina', 'artikelpagina', 'case', 'social-proof'].forEach(type => {
+    ['dienstpagina', 'productpagina', 'artikelpagina', 'case', 'social-proof', 'social-b2c', 'social-video-b2c', 'social-b2b', 'landingspagina-ecommerce', 'nieuwsbrief'].forEach(type => {
       const vragen = fields.intakevragen[type];
       if (Array.isArray(vragen) && vragen.length) {
         const el = document.getElementById('intake-vragen-' + type);
@@ -2814,16 +2855,16 @@ function orFallback(v, fallback) {
   return v || fallback;
 }
 function mdList(items) {
-  return items.length ? items.map(i => `- ${i}`).join('\n') : '_Niet opgegeven_';
+  return items.length ? items.map(i => `- ${i}`).join('\n') : '';
 }
 function chipsToMd(id)     { return mdList(getChips(id)); }
 function chipsToInline(id) {
   const c = getChips(id);
-  return c.length ? c.join(', ') : '_Niet opgegeven_';
+  return c.length ? c.join(', ') : '';
 }
 function pairedToMd(id) {
   const items = getPaired(id);
-  if (!items.length) return '_Niet opgegeven_';
+  if (!items.length) return '';
   return items.map(p => `**${p.naam}** — ${p.desc}`).join('\n');
 }
 function stijldocToMd() {
@@ -2834,7 +2875,7 @@ function stijldocToMd() {
 // ── SETUP.md ──────────────────────────────────────────────────────────────
 function generateSetupMd() {
   const client = orFallback(val('CLIENT_NAME'), 'de klant');
-  const today  = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+  const today  = val('DATUM') || new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
   // Sitemap.xml hoeft NIET als kennisbijlage; URL-lijst zit al in seo.md / knowledge.md
   const brandFiles = uploadedFiles.filter(f => !f.name.toLowerCase().endsWith('.xml'));
   const hasSheet = !!(parsedSheet && parsedSheet.sitestructuur && parsedSheet.sitestructuur.pages && parsedSheet.sitestructuur.pages.length);
@@ -2901,7 +2942,7 @@ function generateSystemPromptMd() {
   const guardrails = getPaired('guardrails');
   const guardrailsSection = guardrails.length
     ? guardrails.map(g => `- ${g.naam}${g.desc ? `: ${g.desc}` : ''}`).join('\n')
-    : '- (geen)';
+    : '';
 
   // Sheet-aanwezigheid bepaalt welke instructies actief zijn (Fase 2 — Keuze D)
   const hasSheet = !!(parsedSheet && parsedSheet.sitestructuur && parsedSheet.sitestructuur.pages && parsedSheet.sitestructuur.pages.length);
@@ -2914,13 +2955,13 @@ function generateSystemPromptMd() {
   if (customTemplateFile && hasSheetTemplates) {
     customTemplateNote = `\nTEMPLATE_BRON: sheet-templates (${sheetTemplateCodes}) leiden de paginastructuur per type. \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is stijlreferentie voor toon en ritme — niet voor structuur.\n`;
   } else if (customTemplateFile) {
-    customTemplateNote = `\nEIGEN_TEMPLATE: \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is leidend voor paginastructuur. Standaard-templates in templates.md = fallback.\n`;
+    customTemplateNote = `\nEIGEN_TEMPLATE: \`custom-template.${customTemplateFile.isPdf ? 'pdf' : 'md'}\` is leidend voor paginastructuur.\n`;
   } else if (hasSheetTemplates) {
-    customTemplateNote = `\nTEMPLATE_BRON: sheet-templates (${sheetTemplateCodes}) per paginatype in \`templates/Txx.md\`. templates.md = fallback voor types zonder sheet-template.\n`;
+    customTemplateNote = `\nTEMPLATE_BRON: sheet-templates (${sheetTemplateCodes}) per paginatype in \`templates/Txx.md\`. Geen sheet-template voor een type → vraag om instructie of zie case/social proof-regime in \`templates.md\`.\n`;
   }
 
   const sheetBronnenNote = hasSheet
-    ? `\n\n## Sheet-data (per-pagina briefings)\n\nKlant heeft een SEO-strategie sheet aangeleverd. Beschikbaar:\n- \`knowledge/briefings.md\` — per toekomstige URL: template, keywords, parent, kinderen, consolidatiebronnen\n${hasSheetTemplates ? '- `templates/T01.md`, `T02.md`, … — klantspecifieke paginastructuren\n' : ''}\nWERKWIJZE bij opdracht "schrijf pagina [URL]":\n1. Zoek de URL in briefings.md → gebruik als intake (skip handmatige intake-vragen).\n2. Pak gekoppelde Template uit templates/. Geen template? Val terug op templates.md.\n3. ≥2 bronnen in briefing: activeer consolidatiemodus.\n4. Interne linking: parent + kinderen uit briefing.`
+    ? `\n\n## Sheet-data (per-pagina briefings)\n\nKlant heeft een SEO-strategie sheet aangeleverd. Beschikbaar:\n- \`knowledge/briefings.md\` — per toekomstige URL: template, keywords, parent, kinderen, consolidatiebronnen\n${hasSheetTemplates ? '- `templates/T01.md`, `T02.md`, … — klantspecifieke paginastructuren\n' : ''}\nWERKWIJZE bij opdracht "schrijf pagina [URL]":\n1. Zoek de URL in briefings.md → gebruik als intake (skip handmatige intake-vragen).\n2. Pak gekoppelde Template uit templates/. Geen sheet-template? Vraag om instructie.\n3. ≥2 bronnen in briefing: activeer consolidatiemodus.\n4. Interne linking: parent + kinderen uit briefing.`
     : '';
 
   const bronnenNote = extraKnowledgeFiles.length
@@ -2944,7 +2985,7 @@ Raadpleeg vóór schrijven, volledig:
 - \`brand.md\` (leidend) — tone of voice, merkwaarden, doelgroep, pijlers
 - \`seo.md\` (leidend) — SEO + GEO regels
 - \`knowledge.md\` (leidend) — producten, entiteiten, bronnen
-- \`templates.md\` (fallback) — paginastructuren
+${(customTemplateFile || hasSheetTemplates) ? '- \\`templates.md\\` — case/social proof regime, intakevragen' : '- \\`templates.md\\` (fallback) — paginastructuren'}
 
 PRIORITEIT: brand.md > regels in dit document. Bij conflict wint brand.md.
 Ontbrekende bijlage → melden en wachten.${sheetBronnenNote}${bronnenNote}
@@ -3034,12 +3075,8 @@ Voor elke aflevering. Herstel elke "nee". Sluit altijd af met rationale-blok.
 ⚠️ AI-output — controleer feiten, links, aanspreekvorm vóór publicatie.
 \`\`\`
 
-## Guardrails
-
-Absoluut. Geen uitzonderingen, ook niet op verzoek.
-
-${guardrailsSection}
-`;
+${guardrailsSection ? `## Guardrails\n\nAbsoluut. Geen uitzonderingen, ook niet op verzoek.\n\n${guardrailsSection}\n` : ''}`;
+}
 }
 
 // ── brand.md ──────────────────────────────────────────────────────────────
@@ -3049,70 +3086,77 @@ function generateBrandMd() {
   const sheetEntSection = sheetEnt
     ? `\n\n## Verplichte entiteiten (uit SEO-strategie)\n\n${sheetEnt.length} brede termen voor merkkoppeling in AI-zoekresultaten (AEO/GEO). Verwerk minimaal 2-3 per pagina, natuurlijk, niet gestapeld:\n\n${sheetEnt.map(t => `- ${t}`).join('\n')}\n\nDeze hebben voorrang op de algemene Merktermen-lijst hieronder bij conflict.`
     : '';
+
+  // Sections zijn alleen aanwezig als er daadwerkelijk inhoud is.
+  // Lege velden worden niet als placeholder meegegeven — dat is ruis voor de LLM.
+  const sec = (title, body) => {
+    const b = (body || '').trim();
+    return b ? `\n## ${title}\n\n${b}\n` : '';
+  };
+
+  const aanspreekvorm = btnGroupValues['AANSPREEKVORM'];
+  const aanspreekvormSection = aanspreekvorm
+    ? `\n## Aanspreekvorm\n\n${aanspreekvorm} — consequent, geen wisseling tussen secties of paginatypen.\n`
+    : '';
+
+  // Tone of voice: de vaste "vakbegrip"-instructie staat er altijd; optionele velden worden weggelaten als leeg.
+  const toonLines = [
+    val('TOON_OMSCHRIJVING')  ? `- Toon: ${val('TOON_OMSCHRIJVING')}` : '',
+    val('TOON_VERMIJDEN')     ? `- Vermijd: ${val('TOON_VERMIJDEN')}` : '',
+    (btnGroupValues['JARGON_BELEID'] || val('JARGON_BELEID'))
+      ? `- Vakjargon: ${btnGroupValues['JARGON_BELEID'] || val('JARGON_BELEID')}` : '',
+    '- Vakbegrip eerste gebruik: korte toelichting tussen haakjes of in de zin.',
+  ].filter(Boolean).join('\n');
+  const toonSection = `\n## Tone of voice\n\n${toonLines}\n`;
+
+  const merkwaardenLijst = val('MERKWAARDEN_LIJST');
+  const merkwaardenSection = merkwaardenLijst
+    ? `\n## Merkwaarden\n\n${merkwaardenLijst}\n\nImpliciet verwerken. Nooit letterlijk noemen.\n`
+    : '';
+
+  const pijlersBody = pairedToMd('pijlers');
+  const pijlersSection = pijlersBody
+    ? `\n## Communicatiepijlers\n\nElke pagina sluit aan bij ≥1 pijler.\n\n${pijlersBody}\n`
+    : '';
+
+  const merktermenBody = pairedToMd('merktermen');
+  const merktermenSection = (merktermenBody || sheetEntSection)
+    ? `\n## Merktermen\n\nVerwerk 2–3 per pagina, natuurlijk. Niet gestapeld of geforceerd.\n\n${merktermenBody}${sheetEntSection}\n`
+    : '';
+
+  // Doelgroep: elke subregel/blok alleen als ingevuld.
+  const doelgroepRol    = val('DOELGROEP_ROL');
+  const doelgroepSector = val('DOELGROEP_SECTOR');
+  const doelgroepNiveau = btnGroupValues['DOELGROEP_NIVEAU'];
+  const doelgroepVocab  = val('DOELGROEP_VOCABULAIRE');
+  const doelgroepWantr  = val('DOELGROEP_WANTROUWEN');
+  const zorgenBody      = chipsToMd('zorgen');
+  const doelgroepParts  = [
+    [doelgroepRol, doelgroepSector, doelgroepNiveau].some(Boolean)
+      ? [
+          doelgroepRol    ? `- Rol: ${doelgroepRol}` : '',
+          doelgroepSector ? `- Sector: ${doelgroepSector}` : '',
+          doelgroepNiveau ? `- Kennisniveau: ${doelgroepNiveau}` : '',
+        ].filter(Boolean).join('\n')
+      : '',
+    zorgenBody   ? `Zorgen:\n${zorgenBody}` : '',
+    doelgroepVocab ? `Vocabulaire (taal van de doelgroep): ${doelgroepVocab}` : '',
+    doelgroepWantr ? `Wantrouwen (vereist extra onderbouwing): ${doelgroepWantr}` : '',
+  ].filter(Boolean).join('\n\n');
+  const doelgroepSection = sec('Doelgroep', doelgroepParts);
+
+  const verbodensBody = chipsToMd('verboden');
+  const verbodenSection = verbodensBody
+    ? `\n## Verboden woorden\n\nNooit gebruiken:\n\n${verbodensBody}\n`
+    : '';
+
+  const stijlBody = stijldocToMd();
+  const stijlSection = stijlBody
+    ? `\n## Stijldocumenten\n\nRaadpleeg vóór schrijven. Ontbrekend → melden en wachten.\n\n${stijlBody}\n`
+    : '';
+
   return `# ${client} — Merkprofiel
-
-## Aanspreekvorm
-
-${orFallback(btnGroupValues['AANSPREEKVORM'], '[niet ingevuld]')} — consequent, geen wisseling tussen secties of paginatypen.
-
-## Tone of voice
-
-- Toon: ${orFallback(val('TOON_OMSCHRIJVING'), '(niet opgegeven)')}
-- Vermijd: ${orFallback(val('TOON_VERMIJDEN'), '(niet opgegeven)')}
-- Vakjargon: ${orFallback(orFallback(btnGroupValues['JARGON_BELEID'], val('JARGON_BELEID')), '(niet opgegeven)')}
-- Vakbegrip eerste gebruik: korte toelichting tussen haakjes of in de zin.
-
-## Merkwaarden
-
-${orFallback(val('MERKWAARDEN_LIJST'), '(niet opgegeven)')}
-
-Impliciet verwerken. Nooit letterlijk noemen.
-
-## Communicatiepijlers
-
-Elke pagina sluit aan bij ≥1 pijler.
-
-${pairedToMd('pijlers')}
-
-## Kernuitkomsten
-
-${chipsToMd('uitkomsten')}
-
-## Redactionele invalshoek
-
-${chipsToMd('strategie')}
-
-## Merktermen
-
-Verwerk 2–3 per pagina, natuurlijk. Niet gestapeld of geforceerd.
-
-${pairedToMd('merktermen')}${sheetEntSection}
-
-## Doelgroep
-
-- Rol: ${orFallback(val('DOELGROEP_ROL'), '(niet opgegeven)')}
-- Sector: ${orFallback(val('DOELGROEP_SECTOR'), '(niet opgegeven)')}
-- Kennisniveau: ${orFallback(btnGroupValues['DOELGROEP_NIVEAU'], '(niet opgegeven)')}
-
-Zorgen:
-${chipsToMd('zorgen')}
-
-Vocabulaire (taal van de doelgroep): ${orFallback(val('DOELGROEP_VOCABULAIRE'), '(niet opgegeven)')}
-
-Wantrouwen (vereist extra onderbouwing): ${orFallback(val('DOELGROEP_WANTROUWEN'), '(niet opgegeven)')}
-
-## Verboden woorden
-
-Nooit gebruiken:
-
-${chipsToMd('verboden')}
-
-## Stijldocumenten
-
-Raadpleeg vóór schrijven. Ontbrekend → melden en wachten.
-
-${stijldocToMd()}
-`;
+${aanspreekvormSection}${toonSection}${merkwaardenSection}${pijlersSection}${sec('Kernuitkomsten', chipsToMd('uitkomsten'))}${sec('Redactionele invalshoek', chipsToMd('strategie'))}${merktermenSection}${doelgroepSection}${verbodenSection}${stijlSection}`;
 }
 
 // ── seo.md ────────────────────────────────────────────────────────────────
@@ -3207,7 +3251,11 @@ function getIntakeVragenMd(type) {
     vragen.map(v => '- ' + v).join('\n') + '\n';
 }
 
-function generateTemplatesMd() {
+// includeStructural = false wanneer de klant eigen template(s) heeft aangeleverd:
+// dan worden de standaard paginastructuren weggelaten zodat ze niet als ruis
+// naast de klantspecifieke templates staan. Case/social proof + element-regels
+// en klantspecifieke intakevragen worden altijd meegenomen.
+function generateTemplatesMd(includeStructural = true) {
   const client = orFallback(val('CLIENT_NAME'), '[KLANT]');
   const doelmarkt = btnGroupValues['DOELMARKT'] || '';
   const doelmarktNote = doelmarkt === 'B2B'
@@ -3218,8 +3266,29 @@ function generateTemplatesMd() {
     ? '\nDOELMARKT: B2B + B2C. Toon aanpassen per context: zakelijk bij beslisser/professional, consumentgericht bij individu.\n'
     : '';
 
-  return `# Content Templates — ${client}
-${doelmarktNote}
+  // Wanneer structural=false: klantspecifieke intakevragen per pagina-type (zonder de tabel-templates).
+  const extraIntakeSection = !includeStructural ? (() => {
+    const items = [
+      ['dienstpagina',             'Dienstpagina'],
+      ['productpagina',            'Productpagina'],
+      ['artikelpagina',            'Artikelpagina'],
+      ['case',                     'Case'],
+      ['social-proof',             'Social proof'],
+      ['social-b2c',               'Social B2C (Instagram/Facebook)'],
+      ['social-video-b2c',         'Social Video B2C (TikTok)'],
+      ['social-b2b',               'Social B2B (LinkedIn)'],
+      ['landingspagina-ecommerce', 'Landingspagina e-commerce'],
+      ['nieuwsbrief',              'Nieuwsbrief/mailing'],
+    ].map(([type, label]) => {
+      const q = getIntakeVragen(type);
+      return q.length
+        ? `### ${label}\n\nExtra intake (vóór schrijven, naast standaard):\n${q.map(v => '- ' + v).join('\n')}`
+        : '';
+    }).filter(Boolean).join('\n\n');
+    return items ? `\n## Klantspecifieke intakevragen\n\n${items}\n` : '';
+  })() : '';
+
+  const structuralPart = includeStructural ? `
 ## Funnel-volgorde
 
 Bewustwording → Probleem → Oplossing → Bewijs → Conversie
@@ -3299,7 +3368,10 @@ GEO-checks:
 - Organisatienaam + productnaam ≥3× per pagina, volledig uitgeschreven.
 - Geen alinea die start met voornaamwoord zonder onderwerp in dezelfde zin.
 - Elk feit heeft inline bronvermelding ("Volgens [bron], …").
+` : extraIntakeSection;
 
+  return `# Content Templates — ${client}
+${doelmarktNote}${structuralPart}
 ## Case / Social proof
 
 AFWIJKEND REGIME: SEO niet leidend. Geen zoekwoorden in H1/H2, geen featured snippets, geen FAQ. Schrijf voor mensen. Kracht: herkenbaarheid + oprechtheid + concreet verhaal. Geen marketingtaal. Geen superlatieven. Feiten en gevoelens naast elkaar.
@@ -3350,6 +3422,124 @@ Case-zelfcheck:
 - Opening bij probleem, niet oplossing?
 - Geen marketingtaal/superlatieven?
 
+## Social media
+
+### Social B2C — Instagram en Facebook
+
+AFWIJKEND REGIME: Geen SEO, geen koppen, geen opsomming van services. Schrijf zoals mensen praten. Emotie en herkenbaarheid sturen de conversie.
+
+**Instagram caption**
+
+| Element | Specs |
+|---------|-------|
+| Openingszin (hook) | ≤125 tekens — staat vóór de "meer"-afbreking. Prikkelend, herkenbaar of verrassend. Nooit openen met bedrijfsnaam of "Wij". |
+| Body | 3–5 korte regels. Witregel tussen alinea's. Conversatietoon. Emojis alleen als huisstijl dit toestaat. |
+| CTA | 1 zachte oproep: "bewaar dit", "stuur door", "reageer hieronder". Geen "klik op de link in bio" als expliciete CTA-zin (te advertentie-achtig). |
+| Hashtags | 5–10 tags, mix breed + niche. Onder de tekst of in eerste reactie. Nooit midden in de tekst. |
+
+Carousel: Slide 1 = zelfstandige hook. Elke slide = 1 idee, ≤6 woorden koptekst. Laatste slide = CTA of kernboodschap. Max. 10 slides.
+
+**Facebook post**
+
+| Element | Specs |
+|---------|-------|
+| Eerste zin | Zichtbaar vóór "meer tonen". Stel een vraag of doe een herkenbare observatie. |
+| Body | Max. 3 alinea's, ≤3 zinnen per alinea. Vriendelijker dan Instagram, iets meer context toegestaan. |
+| Link | In de posttekst zelf (werkt op Facebook, in tegenstelling tot Instagram). |
+| CTA | Directiever dan Instagram: "Lees het artikel", "Bekijk de aanbieding". |
+| Hashtags | 0–3. Facebook-hashtags dragen nauwelijks bij aan bereik. Weglaten tenzij campagne-hashtag. |
+
+NIET DOEN bij social B2C:
+- Corporate taal ("Wij bieden aan", "Onze expertise", "Hoog in de markt")
+- Meerdere CTA's in één post
+- Lange volzinnen of H1/H2-koppen
+- Bedrijfsnaam in eerste zin
+${getIntakeVragenMd('social-b2c')}
+### Social Video B2C — TikTok-script
+
+FORMAAT: Schrijf een gesproken script + tekst-overlay-suggesties. Geen alinea's: regels = momenten. Toon conversationeel en direct — schrijf zoals iemand het uitspreekt.
+
+| Moment | Specs |
+|--------|-------|
+| Hook (0–3 sec) | Opening met actie, vraag of tegenstelling. Tekst-overlay: ≤5 woorden. Spreektekst: 1 zin. Nooit openen met bedrijfsnaam. |
+| Conflict/probleem (3–10 sec) | Herkenbaar probleem of verrassing. Gesproken, direct. |
+| Oplossing (10–40 sec) | Concreet en stapsgewijs. Max. 3–5 punten. Geen jargon. Elke stap ≤1 zin. |
+| CTA (laatste 5 sec) | 1 actie: "volg voor meer", "sla op", "probeer dit zelf". Geen "klik op de link in de bio" als enige CTA. |
+
+Script-regels:
+- Schrijf zoals gesproken, niet zoals geschreven
+- Korte zinnen, ≤10 woorden per zin
+- Geen om-te-constructies ("om te bereiken" → "zo bereik je het")
+- Tekst-overlay emoji: maximaal 2 per video, alleen als visueel nodig
+${getIntakeVragenMd('social-video-b2c')}
+### Social B2B — LinkedIn
+
+PROFIEL: Professionele toon, maar menselijk. Eigen mening en observatie toegestaan en gewenst. Denk: scherpe collega die iets deelt — geen persbericht.
+
+| Element | Specs |
+|---------|-------|
+| Hook (eerste zin) | Zichtbaar vóór "meer weergeven". Observatie, stelling of vraag. ≤100 tekens. Geen bedrijfsnaam in eerste zin. |
+| Body | 3–5 korte alinea's. Witregel tussen elke alinea. Geen bullet-opsomming tenzij lijst echt noodzakelijk. |
+| Inzicht | Concrete takeaway voor de lezer. Sluit af met de kern, niet met een samenvatting. |
+| Afsluiting | Vraag aan de lezer óf zachte CTA. Niet allebei in dezelfde post. |
+| Hashtags | 3–5 professionele tags. Aan het eind van de post. |
+| Link | In reacties plaatsen bij organisch bereik, of onderaan de posttekst bij gesponsorde content. |
+
+Carousel (document-post): Cover = nieuwsgierigheid wekken (niet de conclusie weggen). Elke slide 1 punt, ≤8 woorden koptekst. Laatste slide = naam/logo + CTA.
+
+NIET DOEN bij LinkedIn:
+- Emojis als bullets (⭐ Kwaliteit, 🚀 Groei — kinderspeelplaats-gevoel)
+- "Ik ben verheugd te mededelen" of "Trots te delen"
+- Ellipsis-cliffhanger na elke alinea om clicks te forceren
+- Meerdere externe links in de post zelf
+${getIntakeVragenMd('social-b2b')}
+## Landingspagina e-commerce
+
+DOEL: directe conversie (add-to-cart of aankoop). SEO is secundair. Elk element verwijdert een aankoopdrempel of versterkt het vertrouwen.
+
+| # | Blok | Specs |
+|---|------|-------|
+| 0 | SEO meta | meta_title: product + kernvoordeel ≤65 tekens. meta_description: product + voordeel + actie ≤155 tekens. |
+| 1 | Hero | H1 = product + kernvoordeel in 1 zin. Prijs direct zichtbaar. Primaire CTA (knoptekst = actie + uitkomst). |
+| 2 | Social proof boven vouw | Reviewsterren + aantal beoordelingen direct onder hero. "Beoordeeld door [X] klanten." |
+| 3 | Voordelen (geen features) | H2 "Waarom [product]?" ≤4 voordelen, elk met concreet feit of getal. Voordeel vóór specificatie. |
+| 4 | Product in actie | Alt-teksten beschrijvend, niet decoratief. Geen generieke staffage-foto's. |
+| 5 | Specificaties | Tabel: eigenschap \| waarde \| toelichting. Afsluitend met bronrij. |
+| 6 | Vertrouwensignalen | Retourbeleid, garantie, veilig betalen, leveringstijd. Concrete getallen, geen vage formuleringen. |
+| 7 | Reviews (uitgebreid) | Min. 3 reviews met naam + aankoopdatum. Niet uitsluitend 5-sterren (minder geloofwaardig). |
+| 8 | FAQ | 4–6 vragen gericht op aankoopdrempels: prijs, levering, retour, gebruik, vergelijking alternatief. |
+| 9 | CTA (herhaling) | Zelfde actie als hero. Urgentie alleen als reëel: "Nog [X] op voorraad." Geen nep-urgentie. |
+
+Conversieregels:
+- Elk bezwaar van de koper = potentiële FAQ-vraag
+- Prijs altijd zichtbaar (geen "vraag een offerte" bij directe verkoop)
+- CTA-knoptekst = actie + uitkomst ("Bestel — ontvang morgen")
+- Minimale navigatieafleiding: geen links naar niet-gerelateerde pagina's boven de vouw
+${getIntakeVragenMd('landingspagina-ecommerce')}
+## Nieuwsbrief en mailing
+
+| Element | Specs |
+|---------|-------|
+| Onderwerpregel | ≤50 tekens. Nieuwsgierigheid of concreet voordeel voorop. Geen clickbait, geen ALL CAPS, geen spamwoorden ("GRATIS!!!"). |
+| Preheader | ≤90 tekens. Vult onderwerpregel aan — herhaalt hem niet. Zonder preheader toont e-mailclient "..." of eerste zin body. |
+| Opening | Eerste zin meteen to the point. Geen "Beste abonnee," of "In deze nieuwsbrief...". Aanspreekvorm uit brand.md. |
+| Body | ≤3 blokken. Elk blok = 1 onderwerp. Alinea's ≤3 zinnen. Witregels tussen blokken. |
+| Primaire CTA | 1 actieknop per mail. Knoptekst = actie + uitkomst ("Lees het artikel", "Ontvang de gids"). |
+| Secundaire links | Max. 2, lager in de mail. Geen directe concurrentie met primaire CTA. |
+| Footer | Afmeldlink (wettelijk verplicht), naam organisatie + adres (wettelijk verplicht). |
+
+Mailtypen:
+- **Nieuwsbrief**: informatief, 1 primair onderwerp + max. 2 kortere items, geen harde verkooptoon
+- **Promotie-mail**: 1 aanbieding, concreet voordeel, urgentie met einddatum, harde CTA
+- **Welkomstmail**: warm maar bondig, verwachtingen stellen, eerste waarde geven vóór je iets vraagt
+- **Trigger-mail** (verlaten winkelwagen, follow-up): hyperspecifiek, 1 actie, zo kort mogelijk
+
+NIET DOEN bij mailings:
+- "Bekijk deze mail in uw browser" als eerste leesbare zin
+- Meer dan 1 primaire CTA per mail
+- Afbeeldingen zonder alt-tekst (worden geblokkeerd bij veel e-mailclients)
+- Samengestelde zinnen die pas na 30 woorden tot de kern komen
+${getIntakeVragenMd('nieuwsbrief')}
 ## Element-regels
 
 Koppen:
@@ -3377,23 +3567,17 @@ CTA:
 function generateKnowledgeMd() {
   const client = orFallback(val('CLIENT_NAME'), '[KLANT]');
 
-  // Vakbegrippen as paired list
-  const begrippen = getPaired('begrippen');
-  const begrippensSection = begrippen.length
-    ? begrippen.map(b => `**${b.naam}** — ${b.desc || '_geen instructie_'}`).join('\n')
-    : '_Niet opgegeven_';
-
   // Externe bronnen
   const externeBronnen = getChips('externe-bronnen');
   const externeBronnenSection = externeBronnen.length
     ? `\n**4. Vertrouwde externe bronnen**\n${mdList(externeBronnen)}`
     : '';
 
-  // Producten met URL
+  // Producten met URL (leeg → sectie weggelaten, niet als placeholder)
   const producten = getPaired('producten');
   const productenSection = producten.length
-    ? producten.map(p => `**${p.naam}**${p.url ? ` — [${p.url}](${p.url})` : ''}\n${p.desc || '_geen omschrijving_'}`).join('\n\n')
-    : '_Niet opgegeven_';
+    ? producten.map(p => `**${p.naam}**${p.url ? ` — [${p.url}](${p.url})` : ''}\n${p.desc || ''}`).join('\n\n')
+    : '';
 
   const urlTypeLabel = urlType === 'nieuw' ? 'toekomstige URL\u2019s (nieuwe website / migratie)' : 'huidige live URL\u2019s';
 
@@ -3405,27 +3589,33 @@ function generateKnowledgeMd() {
       ).join('\n\n')
     : '';
 
+  const wetgevingBody  = chipsToMd('wetgeving');
+  const kennisbankBody = chipsToMd('kennisbank');
+
+  const productcatalogusSection = (productenSection || clusterSection)
+    ? `\n## Productcatalogus\n\nURL's = ${urlTypeLabel}.\n${productenSection ? '\n' + productenSection : ''}${clusterSection}\n`
+    : '';
+
+  const kennisbronnenItems = [
+    wetgevingBody  ? `1. Wetgeving (hoogste prioriteit, conflict-winner):\n${wetgevingBody}` : '',
+    kennisbankBody ? `2. Interne kennisbank:\n${kennisbankBody}` : '',
+    `3. Gebruikersinput: vult aan, overschrijft wetgeving nooit.${externeBronnenSection}`,
+  ].filter(Boolean).join('\n\n');
+
+  // Vakbegrippen: introductie-instructies per vakterm (ingevuld via AI-extractie of handmatig).
+  const begrippen = getPaired('begrippen');
+  const begrippensSection = begrippen.length
+    ? `\n## Vakbegrippen\n\nIntroduceer elk begrip bij eerste gebruik zoals hieronder aangegeven.\n\n${begrippen.map(b => `**${b.naam}**${b.desc ? ' — ' + b.desc : ''}`).join('\n')}\n`
+    : '';
+
   return `# Kennisbank — ${client}
 
 ALLEEN onderstaande bronnen + gegevens gebruiken. Verzin geen feiten. Ontbrekend → melden + om aanvulling vragen.
-
-## Productcatalogus
-
-URL's = ${urlTypeLabel}.
-
-${productenSection}${clusterSection}
-
+${productcatalogusSection}
 ## Kennisbronnen (prioriteit hoog → laag)
 
-1. Wetgeving (hoogste prioriteit, conflict-winner):
-${chipsToMd('wetgeving')}
-
-2. Interne kennisbank:
-${chipsToMd('kennisbank')}
-
-3. Gebruikersinput: vult aan, overschrijft wetgeving nooit.
-${externeBronnenSection}
-`;
+${kennisbronnenItems}
+${begrippensSection}`;
 }
 
 // ── Sheet-derived MD generators (Fase 2a) ─────────────────────────────────
@@ -3808,11 +3998,15 @@ async function _doDownloadCustomAgent() {
     const zip  = new JSZip();
     const name = (val('CLIENT_NAME') || 'content-agent').toLowerCase().replace(/\s+/g, '-');
 
+    // Standaard structural templates weglaten als de klant eigen templates heeft aangeleverd.
+    const _hasSheetTpl = !!(parsedSheet && parsedSheet.templates && parsedSheet.templates.length);
+    const _includeStructural = !customTemplateFile && !_hasSheetTpl;
+
     zip.file('SETUP.md',         generateSetupMd());
     zip.file('system-prompt.md', generateSystemPromptMd());
     zip.file('brand.md',         generateBrandMd());
     zip.file('seo.md',           generateSeoMd());
-    zip.file('templates.md',     generateTemplatesMd());
+    zip.file('templates.md',     generateTemplatesMd(_includeStructural));
     zip.file('knowledge.md',     generateKnowledgeMd());
 
     // Sheet-derived bestanden (Fase 2) — alleen als parsedSheet aanwezig
@@ -3971,7 +4165,6 @@ function buildLcConfig() {
     toon:         val('TOON_OMSCHRIJVING')        || '',
     vermijdToon:  val('TOON_VERMIJDEN')           || '',
     jargon:       btnGroupValues['JARGON_BELEID']|| 'branche-specifiek',
-    sitemap:      val('SITEMAP_BESTANDSNAAM')     || 'sitemap.xml',
     maxLinks:     val('MAX_CLUSTER_LINKS')        || '5',
     doelmarkt:    btnGroupValues['DOELMARKT']     || '',
     verboden:     getChips('verboden'),
@@ -3992,6 +4185,7 @@ async function generateAndDownloadLangChain(cmsConfig, migrationConfig = {}, rev
   zip.file('package.json',             lcGenPackageJson(name, mig));
   zip.file('vercel.json',              lcGenVercelJson(mig));
   zip.file('.env.example',             lcGenEnvExample(cmsConfig));
+  zip.file('.gitignore',               '.env.local\n.env\nnode_modules/\n.next/\n*.log\n.DS_Store\n');
   zip.file('README.md',                lcGenReadme(cfg, cmsConfig, migrationConfig, { enabled: rev, domainCritics }));
   zip.file('index.html',               lcGenFrontend(cfg, cmsConfig, migrationConfig, { enabled: rev, domainCritics }));
   zip.file('api/agent.js',             lcGenApiAgent(rev));
@@ -4020,9 +4214,13 @@ async function generateAndDownloadLangChain(cmsConfig, migrationConfig = {}, rev
   zip.file('lib/tools/validate.js',    lcGenToolValidate());
   zip.file('lib/tools/load-knowledge.js', lcGenToolLoadKnowledge());
   zip.file('lib/tools/publish-cms.js', lcGenToolPublishCms(cmsConfig));
+  // Standaard structural templates weglaten als de klant eigen templates heeft aangeleverd.
+  const _lcHasSheetTpl = !!(parsedSheet && parsedSheet.templates && parsedSheet.templates.length);
+  const _lcIncludeStructural = !customTemplateFile && !_lcHasSheetTpl;
+
   zip.file('knowledge/brand.md',       generateBrandMd());
   zip.file('knowledge/seo.md',         generateSeoMd());
-  zip.file('knowledge/templates.md',   generateTemplatesMd());
+  zip.file('knowledge/templates.md',   generateTemplatesMd(_lcIncludeStructural));
   zip.file('knowledge/knowledge.md',   generateKnowledgeMd());
 
   // Sheet-derived bestanden (Fase 2) — alleen bij parsedSheet aanwezig
@@ -4289,28 +4487,31 @@ function lcGenApiAgent(reviewEnabled = false) {
     '}',
     '',
     '// Bronpagina\'s ophalen + consolideren tot één werkbare brief.',
+    '// Retourneert { brief, failed } — failed bevat URLs die niet bereikbaar waren (403/timeout).',
     '// Geen sources → brief blijft zoals hij is.',
     '// 1 source  → bronpagina als context aan brief toegevoegd.',
     '// 2+ sources → consolidate_sources samenvatting + brief als aanvulling.',
     'async function prepareBrief({ brief, sources, pageType, url }) {',
-    '  if (!sources || !sources.length) return brief || "";',
+    '  if (!sources || !sources.length) return { brief: brief || "", failed: [] };',
     '  const fetched = [];',
+    '  const failed = [];',
     '  for (const u of sources) {',
     '    try {',
     '      const r = JSON.parse(await fetchUrlTool.func({ url: u }));',
     '      if (r.success) fetched.push({ url: u, title: r.title || "", content: r.content || "" });',
-    '    } catch (_) { /* skip onbereikbare URL */ }',
+    '      else failed.push(u);',
+    '    } catch (_) { failed.push(u); }',
     '  }',
     '  if (fetched.length >= 2) {',
     '    try {',
     '      const c = JSON.parse(await consolidateTool.func({ sources: fetched, topic: pageType + " over " + url }));',
-    '      if (c.success) return c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : "");',
-    '    } catch (_) { /* fallback below */ }',
+    '      if (c.success) return { brief: c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed };',
+    '    } catch (_) {}',
     '  }',
     '  if (fetched.length === 1) {',
-    '    return "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : "");',
+    '    return { brief: "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed };',
     '  }',
-    '  return brief || "";',
+    '  return { brief: brief || "", failed };',
     '}',
     '',
     '// write_page direct aanroepen (niet via agent.invoke). Voorkomt schema-mismatches:',
@@ -4335,11 +4536,15 @@ function lcGenApiAgent(reviewEnabled = false) {
       '  if (!checkAuth(req, res)) return;',
       '',
       '  const { url, pageType = "dienstpagina", keywords = "", brief = "", sources = [], style = "feitelijk", templateCode = null } = req.body || {};',
+      '  // Invoerlimieten — voorkomt onverwacht grote Claude-calls en kostenoverschrijding.',
+      '  const safeBrief    = String(brief    || "").slice(0, 8000);',
+      '  const safeKeywords = String(keywords || "").slice(0, 500);',
+      '  const safeSources  = Array.isArray(sources) ? sources.slice(0, 5) : [];',
       '',
       '  try {',
-      '    const enrichedBrief = await prepareBrief({ brief, sources, pageType, url });',
-      '    const page = await callWritePage({ brief: enrichedBrief, pageType, url, keywords, templateCode, style });',
-      '    return res.status(200).json({ success: true, content: page.content, page, style });',
+      '    const { brief: enrichedBrief, failed: sourcesFailed } = await prepareBrief({ brief: safeBrief, sources: safeSources, pageType, url });',
+      '    const page = await callWritePage({ brief: enrichedBrief, pageType, url, keywords: safeKeywords, templateCode, style });',
+      '    return res.status(200).json({ success: true, content: page.content, page, style, ...(sourcesFailed.length ? { sourceWarnings: sourcesFailed } : {}) });',
       '  } catch (err) {',
       '    return res.status(500).json({ success: false, error: err.message });',
       '  }',
@@ -4357,40 +4562,51 @@ function lcGenApiAgent(reviewEnabled = false) {
     '    brief = "", sources = [], style = "feitelijk",',
     '    templateCode = null,',
     '  } = req.body || {};',
+    '  // Invoerlimieten — voorkomt onverwacht grote Claude-calls en kostenoverschrijding.',
+    '  const safeBrief    = String(brief    || "").slice(0, 8000);',
+    '  const safeKeywords = String(keywords || "").slice(0, 500);',
+    '  const safeSources  = Array.isArray(sources) ? sources.slice(0, 5) : [];',
     '',
     '  try {',
     '    // 1. Brief verrijken (sources fetch + consolidate)',
-    '    const enrichedBrief = await prepareBrief({ brief, sources, pageType, url });',
+    '    const { brief: enrichedBrief, failed: sourcesFailed } = await prepareBrief({ brief: safeBrief, sources: safeSources, pageType, url });',
     '',
     '    // 2. Writer → v1',
     '    const pageV1 = await callWritePage({ brief: enrichedBrief, pageType, url, keywords, templateCode, style });',
     '    const contentV1 = pageV1.content || "";',
     '',
-    '    // 3. Review (3 critics parallel + synthesizer)',
-    '    const review = await runReview({ content: contentV1, brief: { url, pageType, keywords, brief, style } });',
+    '    // 3. Review (graceful: als review-pipeline faalt, lever v1 + reviewWarning)',
+    '    let review = null;',
+    '    let reviewWarning = null;',
+    '    try {',
+    '      review = await runReview({ content: contentV1, brief: { url, pageType, keywords: safeKeywords, brief: safeBrief, style } });',
+    '    } catch (reviewErr) {',
+    '      reviewWarning = "Review-pipeline tijdelijk niet beschikbaar — pagina geleverd zonder automatische review: " + reviewErr.message;',
+    '    }',
     '',
     '    let finalPage = pageV1;',
     '    let finalContent = contentV1;',
     '    let revised = false;',
     '',
-    '    // 4. Auto-revise bij oranje (max 1x) — opnieuw via direct tool-call',
-    '    if (review.verdict === "orange" && review.revisionPrompt) {',
-    '      const revisedBrief = enrichedBrief + "\\n\\nREVISIE-INSTRUCTIE: " + review.revisionPrompt + "\\n\\nBESTAANDE OUTPUT:\\n" + contentV1;',
-    '      const pageV2 = await callWritePage({ brief: revisedBrief, pageType, url, keywords, templateCode, style });',
-    '      finalPage = pageV2;',
-    '      finalContent = pageV2.content || "";',
-    '      revised = true;',
+    '    // 4. Auto-revise bij oranje (max 1x) — alleen als review succesvol was',
+    '    if (review && review.verdict === "orange" && review.revisionPrompt) {',
+    '      try {',
+    '        const revisedBrief = enrichedBrief + "\\n\\nREVISIE-INSTRUCTIE: " + review.revisionPrompt + "\\n\\nBESTAANDE OUTPUT:\\n" + contentV1;',
+    '        const pageV2 = await callWritePage({ brief: revisedBrief, pageType, url, keywords: safeKeywords, templateCode, style });',
+    '        finalPage = pageV2;',
+    '        finalContent = pageV2.content || "";',
+    '        revised = true;',
+    '      } catch (_) { /* revise mislukt → lever v1 */ }',
     '    }',
     '',
     '    return res.status(200).json({',
     '      success: true,',
     '      content: finalContent,',
     '      page: finalPage,',
-    '      verdict: review.verdict,',
-    '      reports: review.reports,',
-    '      summary: review.summary,',
-    '      revised,',
+    '      ...(review ? { verdict: review.verdict, reports: review.reports, summary: review.summary, revised } : {}),',
     '      style,',
+    '      ...(reviewWarning ? { reviewWarning } : {}),',
+    '      ...(sourcesFailed.length ? { sourceWarnings: sourcesFailed } : {}),',
     '    });',
     '  } catch (err) {',
     '    return res.status(500).json({ success: false, error: err.message });',
@@ -4506,7 +4722,12 @@ SEO- EN GEO-KENNIS (aanvullende richtlijnen van deze klant):
 
 Blocker = mag nooit live (verplicht element ontbreekt).
 Revise = moet scherper voordat het live kan.
-Optional = kan live, maar beter kan.\`;
+Optional = kan live, maar beter kan.
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`;
 
 const BRAND_SYSTEM = \`Je bent een merkredacteur. Je beoordeelt content strikt op trouw aan de merkregels van deze klant.
 
@@ -4524,7 +4745,12 @@ MERKREGELS (brand.md van deze klant):
 
 Blocker = schendt guardrail of verboden woord of fundamenteel off-brand.
 Revise = past niet bij de toon maar is niet disqualificerend.
-Optional = kan scherper.\`;
+Optional = kan scherper.
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`;
 
 const STRATEGY_SYSTEM = \`Je bent een contentstrateeg. Je beoordeelt of deze pagina zijn strategische doel bereikt.
 
@@ -4541,7 +4767,12 @@ MERKREGELS + STRATEGIE (brand.md van deze klant):
 
 Blocker = verkeerd paginatype of spreekt verkeerde doelgroep aan.
 Revise = mist strategische scherpte (CTA onduidelijk, pijler onzichtbaar).
-Optional = kan strategischer.\`;
+Optional = kan strategischer.
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`;
 
 const DOMAIN_SYSTEMS = {
   legal: \`Je bent een juridisch reviewer voor Nederlandse content.
@@ -4560,7 +4791,12 @@ CHECKS (revise):
 - Disclaimer aanwezig bij generieke advies-content
 
 JURIDISCHE KENNIS (domein-pack):
-\${'$'}{domainKnowledge}\`,
+\${'$'}{domainKnowledge}
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`,
 
   medical: \`Je bent een medisch reviewer voor Nederlandse content.
 
@@ -4576,7 +4812,12 @@ CHECKS (revise):
 - Verwijzing naar zorgprofessional bij serieuze klachten
 
 MEDISCHE KENNIS (domein-pack):
-\${'$'}{domainKnowledge}\`,
+\${'$'}{domainKnowledge}
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`,
 
   financial: \`Je bent een compliance-reviewer financiële dienstverlening (AFM/DNB).
 
@@ -4593,7 +4834,12 @@ CHECKS (revise):
 - Doelgroepbescherming gerespecteerd (geen high-risk producten naar retail zonder warnings)
 
 FINANCIËLE KENNIS (domein-pack):
-\${'$'}{domainKnowledge}\`,
+\${'$'}{domainKnowledge}
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`,
 
   claims: \`Je bent een claims-reviewer voor food/cosmetics content (EU-regels).
 
@@ -4608,7 +4854,12 @@ CHECKS (revise):
 - Geen overdreven "natuurlijk/biologisch/puur" zonder certificering
 
 CLAIMS-KENNIS (domein-pack):
-\${'$'}{domainKnowledge}\`,
+\${'$'}{domainKnowledge}
+
+TAALREGELS — verplicht in al je suggesties en herschrijven:
+- VERBODEN: em-dashes (— en –). Altijd vervangen door komma, punt of herschrijven.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Correct Nederlands (NLP). Geen Engelse constructies.\`,
 };
 
 const SYNTHESIZER_SYSTEM = \`Je bent de hoofdredacteur. Je krijgt de output van een writer plus rapporten van 3 tot 5 specialist-critics (SEO/GEO, Brand, Strategy, en soms een domein-critic).
@@ -4624,6 +4875,11 @@ BESLISREGELS:
 - GROEN als alle rapporten alleen "optional" flags hebben of leeg zijn
 
 BIJ ORANJE geef je een revisie-instructie: één bondige paragraaf die de writer vertelt wat er precies moet veranderen — alleen de belangrijkste punten, niet alle flags.
+
+TAALREGELS — verplicht in je revision_prompt:
+- VERBODEN: em-dashes (— en –). Vervang door komma, punt of herschrijf.
+- Geen onnodige hoofdletters mid-sentence ("de Dienst", "het Product", "uw Organisatie").
+- Schrijf revisie-instructies in correct Nederlands (NLP). Geen Engelse constructies.
 
 Geef ALLEEN dit JSON terug:
 {"verdict":"green|orange|red","revision_prompt":"...bij oranje, anders lege string","summary":"één zin waarom deze verdict"}\`;
@@ -4642,7 +4898,8 @@ async function callSynthesizer({ content, reports, brief }) {
     if (!parsed) return { verdict: 'orange', revision_prompt: 'Synthesizer kon geen verdict produceren — handmatige review aanbevolen.', summary: 'Synthesizer parse-fout.' };
     return parsed;
   } catch (err) {
-    return { verdict: 'red', revision_prompt: '', summary: 'Synthesizer-fout: ' + err.message };
+    // 'orange' i.p.v. 'red' — synthesizer-fout blokkeert publicatie niet onnodig.
+    return { verdict: 'orange', revision_prompt: '', summary: 'Synthesizer tijdelijk niet beschikbaar: ' + err.message };
   }
 }
 
@@ -4839,7 +5096,9 @@ _Vul hier regels toe die specifiek zijn voor deze klant._
 
 function lcGenApiMigrate() {
   return [
-    "import { createContentAgent } from '../lib/agent.js';",
+    "import { writePageTool }   from '../lib/tools/write-page.js';",
+    "import { fetchUrlTool }    from '../lib/tools/fetch-url.js';",
+    "import { consolidateTool } from '../lib/tools/consolidate.js';",
     '',
     'export const config = { maxDuration: 300 };',
     '',
@@ -4851,41 +5110,85 @@ function lcGenApiMigrate() {
     '  return true;',
     '}',
     '',
+    '// Bronpagina ophalen en samenvoegen tot een brief (identiek patroon als api/agent.js).',
+    'async function prepareBrief({ brief, sources, pageType, url }) {',
+    '  if (!sources || !sources.length) return brief || "";',
+    '  const fetched = [];',
+    '  for (const u of sources) {',
+    '    try {',
+    '      const r = JSON.parse(await fetchUrlTool.func({ url: u }));',
+    '      if (r.success) fetched.push({ url: u, title: r.title || "", content: r.content || "" });',
+    '    } catch (_) {}',
+    '  }',
+    '  if (fetched.length >= 2) {',
+    '    try {',
+    '      const c = JSON.parse(await consolidateTool.func({ sources: fetched, topic: pageType + " over " + url }));',
+    '      if (c.success) return c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : "");',
+    '    } catch (_) {}',
+    '  }',
+    '  if (fetched.length === 1) {',
+    '    return "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : "");',
+    '  }',
+    '  return brief || "";',
+    '}',
+    '',
+    '// write_page direct aanroepen — geen agent.invoke, voorkomt schema-mismatches.',
+    'async function callWritePage({ brief, pageType, url, keywords, templateCode }) {',
+    '  const out = JSON.parse(await writePageTool.func({',
+    '    brief: brief || "", pageType, url, keywords: keywords || "", templateCode: templateCode || null',
+    '  }));',
+    '  if (!out.success) throw new Error(out.error || "write_page faalde");',
+    '  return out.page;',
+    '}',
+    '',
     'export default async function handler(req, res) {',
     "  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });",
     '  if (!checkAuth(req, res)) return;',
     '',
-    '  const { urls = [], completed = [], batchSize = 3, pageType = "dienstpagina", keywords = "" } = req.body || {};',
+    '  // pages: [{url, keywords, templateCode}] — per-pagina overschrijft globals.',
+    '  // urls: legacy array van URL-strings (backwards compat).',
+    '  const { urls = [], pages = null, completed = [], batchSize = 3, pageType = "dienstpagina", keywords = "" } = req.body || {};',
     '',
-    '  const remaining = urls.filter(u => !completed.includes(u));',
-    '  const batch = remaining.slice(0, batchSize);',
+    '  // Normalize: pages[] nemen voorrang; urls[] worden omgezet zonder per-pagina metadata.',
+    '  const allPages = Array.isArray(pages) && pages.length',
+    '    ? pages',
+    '    : urls.map(u => ({ url: u, keywords, templateCode: null }));',
+    '',
+    '  const allUrls = allPages.map(p => p.url);',
+    '  const remaining = allPages.filter(p => !completed.includes(p.url));',
+    '  // Cap op 5 per batch — voorkomt runaway API-kosten en Vercel-timeout.',
+    '  const batch = remaining.slice(0, Math.min(batchSize, 5));',
     '',
     '  if (!batch.length) {',
-    '    return res.status(200).json({ done: true, completed, remaining: [], results: [], progress: { total: urls.length, done: urls.length } });',
+    '    return res.status(200).json({ done: true, completed, remaining: [], results: [], progress: { total: allUrls.length, done: allUrls.length } });',
     '  }',
     '',
-    '  const agent = createContentAgent();',
     '  const results = [];',
     '',
-    '  for (const url of batch) {',
+    '  for (const entry of batch) {',
+    '    const { url, keywords: pgKw, templateCode: pgTpl } = entry;',
+    '    // Per-pagina keywords/template pakken prioriteit over globals.',
+    '    const effectiveKw  = pgKw  || keywords;',
+    '    const effectivePt  = pgTpl || pageType;',
     '    try {',
-    '      const input = "Haal de pagina op, herschrijf deze volledig op basis van de merkregels en templates, en publiceer als concept.\\nURL: " + url + "\\nPaginatype: " + pageType + "\\nZoekwoorden: " + keywords;',
-    '      const result = await agent.invoke({ input });',
-    '      results.push({ url, success: true, content: result.output });',
+    '      const brief = "Herschrijf deze pagina volledig op basis van de merkregels en templates.\\nURL: " + url + "\\nPaginatype: " + effectivePt + "\\nZoekwoorden: " + effectiveKw;',
+    '      const enrichedBrief = await prepareBrief({ brief, sources: [url], pageType: effectivePt, url });',
+    '      const page = await callWritePage({ brief: enrichedBrief, pageType: effectivePt, url, keywords: effectiveKw, templateCode: pgTpl || null });',
+    '      results.push({ url, success: true, content: page.content, page });',
     '    } catch (err) {',
     '      results.push({ url, success: false, error: err.message });',
     '    }',
     '  }',
     '',
-    '  const newCompleted = [...completed, ...batch];',
-    '  const done = newCompleted.length >= urls.length;',
+    '  const newCompleted = [...completed, ...batch.map(e => e.url)];',
+    '  const done = newCompleted.length >= allUrls.length;',
     '',
     '  return res.status(200).json({',
     '    done,',
     '    completed: newCompleted,',
-    '    remaining: remaining.slice(batchSize),',
+    '    remaining: remaining.slice(batch.length).map(e => e.url),',
     '    results,',
-    '    progress: { total: urls.length, done: newCompleted.length },',
+    '    progress: { total: allUrls.length, done: newCompleted.length },',
     '  });',
     '}',
   ].join('\n');
@@ -4893,9 +5196,7 @@ function lcGenApiMigrate() {
 
 function lcGenLibAgent(migration = false) {
   const lines = [
-    "import { createToolCallingAgent, AgentExecutor } from 'langchain/agents';",
     "import { ChatAnthropic } from '@langchain/anthropic';",
-    "import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';",
     "import { fetchUrlTool }      from './tools/fetch-url.js';",
     "import { consolidateTool }   from './tools/consolidate.js';",
     "import { writePageTool }     from './tools/write-page.js';",
@@ -4915,9 +5216,8 @@ function lcGenLibAgent(migration = false) {
     );
   }
   lines.push(
-    "import { SYSTEM_PROMPT } from './prompts.js';",
     '',
-    '// Claude heeft native tool-calling — gebruik createToolCallingAgent (niet ReAct)',
+    '// Gedeeld ChatAnthropic-model — importeerbaar door api/* en lib/*.',
     'const model = new ChatAnthropic({',
     '  apiKey: process.env.Claude ?? process.env.ANTHROPIC_API_KEY,',
     "  model: 'claude-sonnet-4-6',",
@@ -4933,17 +5233,8 @@ function lcGenLibAgent(migration = false) {
   }
   lines.push(
     '',
-    '// Prompt-template: system-instructies + menselijke input + scratchpad voor tool-calls',
-    'const prompt = ChatPromptTemplate.fromMessages([',
-    "  ['system', SYSTEM_PROMPT],",
-    "  ['human', '{input}'],",
-    "  new MessagesPlaceholder('agent_scratchpad'),",
-    ']);',
-    '',
-    'export function createContentAgent() {',
-    '  const agent = createToolCallingAgent({ llm: model, tools, prompt });',
-    '  return new AgentExecutor({ agent, tools, maxIterations: 10, verbose: false });',
-    '}',
+    '// Gedeelde model- en toolsinstanties — importeerbaar door api/* en lib/*.',
+    '// Agent-executor patroon is vervangen door directe tool-calls in api/agent.js en api/migrate.js.',
   );
   return lines.join('\n');
 }
@@ -5063,6 +5354,7 @@ function lcGenToolFetchUrl() {
     'export const fetchUrlTool = tool(',
     '  async ({ url }) => {',
     '    try {',
+    '      if (!/^https?:\\/\\//i.test(url)) throw new Error("Alleen http(s) URLs zijn toegestaan.");',
     "      const res = await fetch(url, { headers: { 'User-Agent': 'ContentAgent/1.0' } });",
     "      if (!res.ok) throw new Error('HTTP ' + res.status);",
     '      const html = await res.text();',
@@ -5165,21 +5457,23 @@ function lcGenToolWritePage() {
     "      const isCaseType = pageType === 'case' || pageType === 'social proof snippet';",
     '',
     '      // Klantspecifieke template uit templates/Tnn.md (heeft voorrang op generieke templates.md)',
-    '      const customTpl = templateCode ? readTemplate(templateCode) : null;',
+    '      const customTpl = templateCode ? await readTemplate(templateCode) : null;',
     "      const tplBlock = customTpl",
     "        ? '## KLANTSPECIFIEKE TEMPLATE (' + templateCode + ') — leidend voor structuur\\n\\n' + customTpl + '\\n\\n---\\n\\n## Generieke fallback (alleen als sheet-template een aspect niet dekt)\\n\\n' + templates",
     "        : templates;",
     '',
     '      // Per-URL briefing uit briefings.md (geeft de agent contextuele intel: parent, kinderen, primair zoekwoord, opmerking)',
-    '      const urlBriefing = url ? readBriefing(url) : null;',
+    '      const urlBriefing = url ? await readBriefing(url) : null;',
     "      const briefingBlock = urlBriefing ? '\\n\\n---\\n\\n## URL-briefing (uit SEO-strategie)\\n\\n' + urlBriefing : '';",
     '',
+    '      const langRules = "\\n\\n---\\n\\n## TAALREGELS (altijd verplicht — ook bij revisies)\\n\\n- Schrijf correct Nederlands (NLP). Geen Engelse constructies in Nederlandse zinnen.\\n- VERBODEN: em-dashes (— en –). Vervang altijd door een komma, een punt of herschrijf de zin.\\n- Geen onnodige hoofdletters mid-sentence. Niet: \'de Dienst\', \'ons Product\', \'uw Organisatie\'.\\n- Houd de aanspreekvorm (je of u) consistent door de gehele tekst.\\n- Geen AI-clichés: geen \'in de wereld van\', \'in dit artikel\', \'kom meer te weten\', \'navigeer naar\'.";',
     '      const systemContent = isCaseType',
-    '        ? brand + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock',
-    '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock;',
+    '        ? brand + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules',
+    '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules;',
+    '      const mdRules = "\\n\\nOPMAAK-REGELS voor het content-veld (verplicht):\\n- Gebruik altijd een lege regel vóór én na elk kopje (##, ###)\\n- Gebruik altijd een lege regel voor en na een lijst\\n- Gebruik altijd een lege regel tussen alinea\'s\\n- Twee alinea\'s nooit direct aan elkaar plakken\\n- Geen trailing whitespace op regels";',
     '      const userPrompt = isCaseType',
-    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
-    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...\",\"meta_description\":\"...\",\"slug\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}';",
+    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
+    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...\",\"meta_description\":\"...\",\"slug\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}';"  ,
     '      const response = await model.invoke([',
     "        { role: 'system', content: systemContent },",
     "        { role: 'user',   content: userPrompt }",
@@ -5270,7 +5564,8 @@ function lcGenToolLoadKnowledge() {
     ' */',
     "import { tool } from '@langchain/core/tools';",
     "import { z } from 'zod';",
-    "import { readFileSync } from 'fs';",
+    "import { readFile } from 'fs/promises';",
+    '// readFile (async) i.p.v. readFileSync — blokkeert de event loop niet in serverless.',
     "import { join } from 'path';",
     '',
     '// process.cwd() = projectroot in Vercel; __dirname werkt niet betrouwbaar in ESM-functies',
@@ -5278,27 +5573,28 @@ function lcGenToolLoadKnowledge() {
     "const TEMPLATES_DIR = join(process.cwd(), 'templates');",
     '',
     'export async function readKnowledge() {',
-    '  const read = name => {',
-    '    try { return readFileSync(join(KNOWLEDGE_DIR, name + \'.md\'), \'utf8\'); }',
+    '  const read = async name => {',
+    '    try { return await readFile(join(KNOWLEDGE_DIR, name + \'.md\'), \'utf8\'); }',
     "    catch { return '# ' + name + '.md\\n_Bestand niet gevonden_'; }",
     '  };',
-    '  return { brand: read(\'brand\'), seo: read(\'seo\'), templates: read(\'templates\'), knowledge: read(\'knowledge\') };',
+    '  const [brand, seo, templates, knowledge] = await Promise.all([read(\'brand\'), read(\'seo\'), read(\'templates\'), read(\'knowledge\')]);',
+    '  return { brand, seo, templates, knowledge };',
     '}',
     '',
     '// Klantspecifieke template uit templates/Tnn.md (parsedSheet-derived).',
     '// Retourneert null als bestand niet bestaat — caller mag dan terugvallen op templates.md.',
-    'export function readTemplate(code) {',
+    'export async function readTemplate(code) {',
     '  if (!code || !/^T\\d+/i.test(String(code))) return null;',
-    '  try { return readFileSync(join(TEMPLATES_DIR, code + \'.md\'), \'utf8\'); }',
+    '  try { return await readFile(join(TEMPLATES_DIR, code + \'.md\'), \'utf8\'); }',
     '  catch { return null; }',
     '}',
     '',
     '// Briefing voor één URL uit knowledge/briefings.md (parsedSheet-derived).',
     '// Retourneert de tekst van de H2-sectie, of null als URL niet voorkomt.',
-    'export function readBriefing(url) {',
+    'export async function readBriefing(url) {',
     '  if (!url) return null;',
     '  try {',
-    "    const all = readFileSync(join(KNOWLEDGE_DIR, 'briefings.md'), 'utf8');",
+    "    const all = await readFile(join(KNOWLEDGE_DIR, 'briefings.md'), 'utf8');",
     "    const escaped = url.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');",
     "    const re = new RegExp('## ' + escaped + '\\\\n([\\\\s\\\\S]*?)(?=\\\\n## |$)');",
     '    const m = all.match(re);',
@@ -6161,7 +6457,8 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
 
   // Sheet-data embedden voor live briefing-loading in de frontend
   const sheetPages = buildSheetPagesForFrontend(parsedSheet);
-  const sheetPagesJsLiteral = sheetPages ? JSON.stringify(sheetPages) : 'null';
+  // Escape </ zodat sheet-data niet uit de <script>-tag kan breken (XSS-preventie).
+  const sheetPagesJsLiteral = sheetPages ? JSON.stringify(sheetPages).replace(/<\//g, '<\\/') : 'null';
   const sheetCount = sheetPages ? sheetPages.length : 0;
 
   const navMigTab    = mig ? `<button class="nav-tab" onclick="switchTab('migratie')">Migratie</button>` : '';
@@ -6382,9 +6679,19 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     .output-label { font-size: 13px; font-weight: 600; color: var(--dark-grey); }
     .output-content {
       padding: 20px; font-size: 14px; line-height: 1.7;
-      white-space: pre-wrap; font-family: monospace; max-height: 500px;
-      overflow-y: auto; color: var(--near-black);
+      max-height: 500px; overflow-y: auto; color: var(--near-black);
     }
+    .output-content h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; }
+    .output-content h2 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: var(--dark-grey); }
+    .output-content h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+    .output-content h4 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+    .output-content p  { margin: 0 0 10px; }
+    .output-content ul, .output-content ol { padding-left: 22px; margin: 0 0 10px; }
+    .output-content li { margin-bottom: 4px; }
+    .output-content hr { border: none; border-top: 1px solid var(--light-grey); margin: 18px 0; }
+    .output-content code { background: var(--off-white); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 12px; }
+    .output-content strong { font-weight: 600; }
+    .output-content.raw-mode { font-family: monospace; white-space: pre-wrap; font-size: 12px; }
     .status-bar {
       padding: 12px 16px; border-radius: 8px; font-size: 14px;
       margin-top: 12px; display: none;
@@ -6393,6 +6700,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     .status-bar.info { background: var(--purple-light); color: var(--purple); }
     .status-bar.success { background: #E6F7EE; color: #1A7A45; }
     .status-bar.error { background: #FEE8E8; color: #C0392B; }
+    .status-bar.warn  { background: #FFF8E1; color: #92400E; }
 
     .progress-wrap { margin-top: 16px; display: none; }
     .progress-wrap.show { display: block; }
@@ -6410,8 +6718,32 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     .result-dot.ok { background: #27AE60; }
     .result-dot.err { background: #E74C3C; }
     .result-url { font-weight: 600; flex: 1; }
-    .result-body { display: none; padding: 14px; font-size: 13px; font-family: monospace; white-space: pre-wrap; border-top: 1px solid var(--light-grey); max-height: 300px; overflow-y: auto; }
+    .result-body { display: none; padding: 14px; font-size: 13px; line-height: 1.6; border-top: 1px solid var(--light-grey); max-height: 300px; overflow-y: auto; }
     .result-body.open { display: block; }
+    .result-body h1 { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
+    .result-body h2 { font-size: 14px; font-weight: 600; margin: 12px 0 6px; color: var(--dark-grey); }
+    .result-body h3, .result-body h4 { font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
+    .result-body p  { margin: 0 0 8px; }
+    .result-body ul, .result-body ol { padding-left: 18px; margin: 0 0 8px; }
+    .result-body li { margin-bottom: 3px; }
+    .result-body hr { border: none; border-top: 1px solid var(--light-grey); margin: 10px 0; }
+    .result-body code { background: var(--off-white); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-size: 11px; }
+    .result-body strong { font-weight: 600; }
+
+    /* Bulk page selector */
+    .bulk-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .bulk-toolbar .btn-secondary { padding: 6px 14px; font-size: 12px; border-radius: 7px; }
+    .bulk-toolbar input { flex: 1; min-width: 140px; font-size: 12px; padding: 6px 10px; border: 1px solid var(--light-grey); border-radius: 7px; font-family: inherit; outline: none; }
+    .bulk-toolbar input:focus { border-color: var(--purple); }
+    .sel-count { font-size: 12px; color: var(--mid-grey); white-space: nowrap; }
+    .page-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--light-grey); border-radius: 8px; background: white; }
+    .page-list-item { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--light-grey); font-size: 12px; cursor: pointer; user-select: none; }
+    .page-list-item:last-child { border-bottom: none; }
+    .page-list-item:hover { background: var(--off-white); }
+    .page-list-item input[type=checkbox] { flex-shrink: 0; cursor: pointer; accent-color: var(--purple); }
+    .pl-url { flex: 1; font-family: monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tpl-badge { font-size: 10px; background: var(--purple-light); color: var(--purple); padding: 2px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; font-weight: 600; }
+    .pl-kw { font-size: 11px; color: var(--mid-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
 
     .api-card {
       background: white; border-radius: 16px; padding: 28px 32px;
@@ -6487,6 +6819,16 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     .report-summary { color: var(--dark-grey); font-weight: 400; font-size: 13px; }
     .report-body { display: none; padding: 0 16px 16px; }
     .report-body.open { display: block; }
+    /* Checklist-stijl voor critic-rapporten */
+    .revised-note { background: #E6F7EE; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #1A7A45; margin-bottom: 10px; }
+    .check-item { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--light-grey); align-items: flex-start; }
+    .check-item:last-child { border-bottom: none; }
+    .check-icon { font-size: 15px; flex-shrink: 0; line-height: 1.4; }
+    .check-text { flex: 1; min-width: 0; }
+    .check-text strong { display: block; font-size: 13px; font-weight: 600; color: var(--near-black); margin-bottom: 2px; }
+    .check-text span { font-size: 12px; color: var(--dark-grey); line-height: 1.5; }
+    .check-empty { font-size: 13px; color: var(--mid-grey); padding: 8px 0; }
+    /* Oud: behoud voor eventuele backward compat */
     .flag {
       padding: 10px 12px; border-radius: 8px; margin-top: 8px; font-size: 13px;
       border-left: 3px solid var(--mid-grey);
@@ -6604,6 +6946,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       </div>
       <button class="btn-primary" onclick="schrijfPagina(this)">Schrijf pagina</button>
       <div class="status-bar" id="w-status"></div>
+      <div class="status-bar" id="w-source-warn"></div>
       <div id="w-verdict-wrap" style="display:none">
         <div class="verdict-bar" id="w-verdict">
           <div class="verdict-dot" id="w-verdict-dot"></div>
@@ -6618,7 +6961,10 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       <div class="output-box" id="w-output">
         <div class="output-header">
           <span class="output-label">Gegenereerde pagina</span>
-          <button class="btn-secondary" onclick="copyOutput('w-content')">Kopieer</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn-secondary" id="w-raw-btn" onclick="toggleRawContent()" title="Schakel tussen rendered preview en raw markdown">Raw</button>
+            <button class="btn-secondary" onclick="copyOutput('w-content')">Kopieer markdown</button>
+          </div>
         </div>
         <div class="output-content" id="w-content"></div>
       </div>
@@ -6718,7 +7064,60 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   }
 
   function copyOutput(id) {
-    navigator.clipboard.writeText(document.getElementById(id).textContent);
+    const el = document.getElementById(id);
+    navigator.clipboard.writeText(el.dataset.raw || el.textContent || '');
+  }
+
+  // Minimale markdown → HTML renderer (geen externe afhankelijkheid)
+  function renderMd(md) {
+    if (!md) return '';
+    const safe = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const inline = s => safe(s)
+      .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
+      .replace(/`([^`\n]+?)`/g,'<code>$1</code>');
+
+    const lines = md.split('\n');
+    const out = [];
+    let inUl = false, inOl = false, pBuf = [];
+
+    const flushP = () => { if (pBuf.length) { out.push('<p>' + pBuf.join(' ') + '</p>'); pBuf = []; } };
+    const closeUl = () => { if (inUl) { out.push('</ul>'); inUl = false; } };
+    const closeOl = () => { if (inOl) { out.push('</ol>'); inOl = false; } };
+    const closeLists = () => { closeUl(); closeOl(); };
+
+    for (const raw of lines) {
+      const t = raw.trim();
+      if (!t) { flushP(); closeLists(); continue; }
+      const hm = t.match(/^(#{1,4})\s+(.+)/);
+      if (hm) { flushP(); closeLists(); out.push('<h' + hm[1].length + '>' + inline(hm[2]) + '</h' + hm[1].length + '>'); continue; }
+      if (/^---+$/.test(t)) { flushP(); closeLists(); out.push('<hr>'); continue; }
+      const ulm = t.match(/^[-*]\s+(.*)/);
+      if (ulm) { flushP(); closeOl(); if (!inUl) { out.push('<ul>'); inUl = true; } out.push('<li>' + inline(ulm[1]) + '</li>'); continue; }
+      const olm = t.match(/^\d+\.\s+(.*)/);
+      if (olm) { flushP(); closeUl(); if (!inOl) { out.push('<ol>'); inOl = true; } out.push('<li>' + inline(olm[1]) + '</li>'); continue; }
+      closeLists();
+      pBuf.push(inline(t));
+    }
+    flushP(); closeLists();
+    return out.join('\n');
+  }
+
+  let _rawMode = false;
+  function toggleRawContent() {
+    _rawMode = !_rawMode;
+    const el = document.getElementById('w-content');
+    const btn = document.getElementById('w-raw-btn');
+    if (_rawMode) {
+      el.textContent = el.dataset.raw || '';
+      el.classList.add('raw-mode');
+      btn.textContent = 'Rendered';
+    } else {
+      el.innerHTML = renderMd(el.dataset.raw || '');
+      el.classList.remove('raw-mode');
+      btn.textContent = 'Raw';
+    }
   }
 
   // ── Sheet-picker: autocomplete + briefing-load ──
@@ -6738,6 +7137,72 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         : p.url;
       return '<option value="' + escHtml(p.url) + '">' + escHtml(label) + '</option>';
     }).join('');
+    // Also populate the bulk selector on the migration tab (if present)
+    initBulkSelector();
+  }
+
+  function initBulkSelector() {
+    const pages = window.__SHEET_PAGES__;
+    const listEl = document.getElementById('m-page-list');
+    const selectorEl = document.getElementById('m-sheet-selector');
+    if (!pages || !pages.length || !listEl || !selectorEl) return;
+
+    // Build checkbox list
+    listEl.innerHTML = pages.map(p => {
+      const allKw = [p.primair, ...(p.secundair || []), ...(p.longtail || [])].filter(Boolean);
+      const kwPreview = allKw.slice(0, 2).join(', ');
+      return '<label class="page-list-item">'
+        + '<input type="checkbox" class="bulk-page-cb"'
+        + ' data-url="' + escHtml(p.url) + '"'
+        + ' data-kw="' + escHtml(allKw.join(', ')) + '"'
+        + ' data-tpl="' + escHtml(p.template || '') + '"'
+        + ' checked onchange="updateSelCount()" />'
+        + '<span class="pl-url">' + escHtml(p.url) + '</span>'
+        + (p.template ? '<span class="tpl-badge">' + escHtml(p.template) + '</span>' : '')
+        + (kwPreview ? '<span class="pl-kw">' + escHtml(kwPreview) + '</span>' : '')
+        + '</label>';
+    }).join('');
+
+    // Switch UI: hide textarea + global keywords, show selector
+    const urlsWrap = document.getElementById('m-urls-wrap');
+    const kwRow    = document.getElementById('m-keywords-row');
+    if (urlsWrap) urlsWrap.style.display = 'none';
+    if (kwRow)    kwRow.style.display    = 'none';
+    selectorEl.style.display = '';
+
+    updateSelCount();
+  }
+
+  function toggleAllPages(checked) {
+    document.querySelectorAll('.bulk-page-cb').forEach(cb => {
+      if (cb.closest('.page-list-item').style.display !== 'none') cb.checked = checked;
+    });
+    updateSelCount();
+  }
+
+  function filterBulkPages(query) {
+    const q = (query || '').toLowerCase();
+    document.querySelectorAll('.page-list-item').forEach(item => {
+      const url = (item.querySelector('.pl-url')  || {}).textContent || '';
+      const tpl = (item.querySelector('.tpl-badge') || {}).textContent || '';
+      item.style.display = (!q || url.toLowerCase().includes(q) || tpl.toLowerCase().includes(q)) ? '' : 'none';
+    });
+    updateSelCount();
+  }
+
+  function updateSelCount() {
+    const all     = document.querySelectorAll('.bulk-page-cb');
+    const checked = [...all].filter(cb => cb.checked).length;
+    const el = document.getElementById('m-sel-count');
+    if (el) el.textContent = checked + ' van ' + all.length + ' geselecteerd';
+  }
+
+  function getSelectedPages() {
+    return [...document.querySelectorAll('.bulk-page-cb:checked')].map(cb => ({
+      url: cb.dataset.url,
+      keywords: cb.dataset.kw || '',
+      templateCode: cb.dataset.tpl || null,
+    }));
   }
 
   function findSheetPage(query) {
@@ -6828,6 +7293,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     btn.disabled = true;
     btn.textContent = 'Bezig…';
     setStatus('w-status', 'Agent schrijft — en review-pipeline (3 critics + synthesizer) loopt na afloop. Tel op ~60–120 seconden.', 'info');
+    hideStatus('w-source-warn');
     document.getElementById('w-output').classList.remove('show');
     document.getElementById('w-verdict-wrap').style.display = 'none';
     lastPage = null;
@@ -6845,7 +7311,14 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       });
       const data = await parseResponse(res);
       if (!res.ok || !data.success) throw new Error(data.error || 'Onbekende fout');
-      document.getElementById('w-content').textContent = data.content;
+      const _wContent = document.getElementById('w-content');
+      const _rawMd = data.content || '';
+      _wContent.dataset.raw = _rawMd;
+      _wContent.classList.remove('raw-mode');
+      _wContent.innerHTML = renderMd(_rawMd);
+      _rawMode = false;
+      const _rawBtn = document.getElementById('w-raw-btn');
+      if (_rawBtn) _rawBtn.textContent = 'Raw';
       document.getElementById('w-output').classList.add('show');
       lastPage = data.page || { content: data.content };
       lastVerdict = data.verdict || null;
@@ -6854,6 +7327,18 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         hideStatus('w-status');
       } else {
         setStatus('w-status', '✓ Pagina gegenereerd. Controleer de inhoud vóór publicatie.', 'success');
+      }
+      const warns = [];
+      if (data.sourceWarnings && data.sourceWarnings.length) {
+        warns.push('⚠ ' + data.sourceWarnings.length + ' bronpagina' + (data.sourceWarnings.length > 1 ? '\'s' : '') + ' niet bereikbaar (403/bot-block): ' + data.sourceWarnings.join(', '));
+      }
+      if (data.reviewWarning) {
+        warns.push('⚠ ' + data.reviewWarning);
+      }
+      if (warns.length) {
+        setStatus('w-source-warn', warns.join(' | '), 'warn');
+      } else {
+        hideStatus('w-source-warn');
       }
     } catch (err) {
       setStatus('w-status', 'Fout: ' + err.message, 'error');
@@ -6865,9 +7350,9 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
 
   const ROLE_LABELS = { seo: 'SEO / GEO', brand: 'Brand', strategy: 'Strategy', legal: 'Juridisch', medical: 'Medisch', financial: 'Financieel', claims: 'Claims' };
   const VERDICT_TEXT = {
-    green:  { title: 'Groen — publish-ready', hint: 'Alle critics akkoord. Klik "Publiceer concept" om naar het CMS te pushen.' },
-    orange: { title: 'Oranje — auto-revised', hint: 'De writer heeft één revisie-ronde doorlopen. Lees de rapporten; publiceren kan, maar check scherp.' },
-    red:    { title: 'Rood — human review vereist', hint: 'Een of meerdere critics vonden een blocker. Publiceren geblokkeerd totdat een mens de output herschrijft.' },
+    green:  { title: 'Klaar voor publicatie', hint: 'Alle critics akkoord — geen openstaande punten.' },
+    orange: { title: 'Tekst bijgewerkt', hint: 'De schrijfagent heeft de tekst al bijgewerkt op basis van de critic-feedback. Bekijk de aandachtspunten hieronder vóór publicatie.' },
+    red:    { title: 'Human review vereist', hint: 'Een critic vond een blocker die handmatige correctie vereist. Publiceren is geblokkeerd.' },
   };
 
   function renderVerdict(data) {
@@ -6882,37 +7367,64 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     bar.className = 'verdict-bar ' + verdict;
     dot.className = 'verdict-dot ' + verdict;
     const meta = VERDICT_TEXT[verdict] || VERDICT_TEXT.orange;
-    title.innerHTML = meta.title + (data.revised ? '<span class="revise-badge">herzien</span>' : '');
+    title.textContent = meta.title;
     summary.textContent = data.summary || meta.hint;
     publishBtn.style.display = verdict === 'red' ? 'none' : '';
 
-    // Render reports
+    // Render reports als afvinklijst
     const reportsEl = document.getElementById('w-reports');
     reportsEl.innerHTML = '';
     const reports = data.reports || {};
+    const isRevised = !!data.revised;
+
     Object.keys(reports).forEach(role => {
       const rep = reports[role] || {};
       const flags = Array.isArray(rep.flags) ? rep.flags : [];
       const item = document.createElement('div');
       item.className = 'report';
       const label = ROLE_LABELS[role] || role;
-      const flagCount = flags.length ? ' — ' + flags.length + ' ' + (flags.length === 1 ? 'opmerking' : 'opmerkingen') : ' — geen opmerkingen';
+
+      // Header-icoon: ✓ als alleen optionals (of geen), ⚠ bij revise/blocker
+      const hasOpenIssue = flags.some(f => f.severity === 'blocker' || f.severity === 'revise');
+      const headerIcon = hasOpenIssue ? '⚠️' : '✓';
+      const headerColor = hasOpenIssue ? '#E67E22' : '#27AE60';
+      const openCount = flags.filter(f => f.severity !== 'optional').length;
+      const optCount  = flags.filter(f => f.severity === 'optional').length;
+      const headerLabel = openCount
+        ? openCount + ' aandachtspunt' + (openCount > 1 ? 'en' : '') + (optCount ? ', ' + optCount + ' optioneel' : '')
+        : (optCount ? optCount + ' optioneel' : 'alles in orde');
+
+      // Body: optionele "al bijgewerkt"-melding + checkpunten
+      let bodyHtml = '';
+      if (isRevised && flags.length) {
+        bodyHtml += '<div class="revised-note">✓ De schrijfagent heeft de tekst al bijgewerkt op basis van onderstaande punten. Controleer of het resultaat klopt.</div>';
+      }
+      if (flags.length) {
+        bodyHtml += flags.map(f => {
+          const sev = f.severity || 'optional';
+          const icon = sev === 'optional' ? '💡' : '⚠️';
+          const label = sev === 'optional' ? 'Optioneel' : 'Aandachtspunt';
+          return '<div class="check-item">' +
+            '<div class="check-icon">' + icon + '</div>' +
+            '<div class="check-text">' +
+              '<strong>' + escHtml(label) + ' — ' + escHtml(f.issue || '') + '</strong>' +
+              (f.suggestion ? '<span>' + escHtml(f.suggestion) + '</span>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('');
+      } else {
+        bodyHtml += '<div class="check-empty">✓ Geen opmerkingen — alle checks geslaagd.</div>';
+      }
+
       item.innerHTML =
         '<div class="report-header" onclick="toggleReport(this)">' +
-          '<span class="report-role-tag">' + label + '</span>' +
+          '<span style="font-size:14px;color:' + headerColor + ';flex-shrink:0;line-height:1">' + headerIcon + '</span>' +
+          '<span class="report-role-tag">' + escHtml(label) + '</span>' +
           '<span class="report-role"><span class="report-summary">' + escHtml(rep.summary || '') + '</span></span>' +
-          '<span style="color:var(--mid-grey);font-size:12px">' + flagCount + '</span>' +
+          '<span style="color:var(--mid-grey);font-size:12px;white-space:nowrap">' + escHtml(headerLabel) + '</span>' +
         '</div>' +
-        '<div class="report-body">' +
-          (flags.length
-            ? flags.map(f =>
-                '<div class="flag ' + (f.severity || 'optional') + '">' +
-                  '<div class="flag-issue"><span class="flag-severity">' + (f.severity || 'optional') + '</span>' + escHtml(f.issue || '') + '</div>' +
-                  (f.suggestion ? '<div class="flag-suggestion">' + escHtml(f.suggestion) + '</div>' : '') +
-                '</div>'
-              ).join('')
-            : '<div style="font-size:13px;color:var(--mid-grey);padding:10px 0">Geen opmerkingen van deze critic.</div>') +
-        '</div>';
+        '<div class="report-body">' + bodyHtml + '</div>';
+
       reportsEl.appendChild(item);
     });
 
@@ -6951,9 +7463,24 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
 
   async function startBulk(btn) {
     if (bulkRunning) { bulkRunning = false; btn.textContent = 'Start bulk generatie'; return; }
-    const urlsRaw = document.getElementById('m-urls').value.trim();
-    const urls = urlsRaw ? urlsRaw.split('\\n').map(u => u.trim()).filter(Boolean) : [];
-    if (!urls.length) { setStatus('m-status', 'Vul minimaal één URL in.', 'error'); return; }
+
+    // Determine source: sheet selector (when present + visible) vs manual textarea
+    const sheetSel  = document.getElementById('m-sheet-selector');
+    const useSheet  = sheetSel && sheetSel.style.display !== 'none';
+    let pages, totalCount;
+
+    if (useSheet) {
+      pages = getSelectedPages();
+      if (!pages.length) { setStatus('m-status', 'Selecteer minimaal één pagina.', 'error'); return; }
+      totalCount = pages.length;
+    } else {
+      const urlsRaw = document.getElementById('m-urls').value.trim();
+      const urls = urlsRaw ? urlsRaw.split('\\n').map(u => u.trim()).filter(Boolean) : [];
+      if (!urls.length) { setStatus('m-status', 'Vul minimaal één URL in.', 'error'); return; }
+      const keywords = document.getElementById('m-keywords').value.trim();
+      pages = urls.map(u => ({ url: u, keywords, templateCode: null }));
+      totalCount = urls.length;
+    }
 
     bulkRunning = true;
     btn.textContent = 'Stop';
@@ -6962,24 +7489,37 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     hideStatus('m-status');
 
     let completed = [];
-    const keywords = document.getElementById('m-keywords').value.trim();
+    let consecutiveErrors = 0;
+    const MAX_ERRORS = 3;
 
     while (bulkRunning) {
       try {
         const res = await fetch('/api/migrate', {
           method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ urls, completed, batchSize: 3, pageType: migratePagetype, keywords }),
+          body: JSON.stringify({ pages, completed, batchSize: 3, pageType: migratePagetype }),
         });
         const data = await parseResponse(res);
-        if (!res.ok) throw new Error(data.error || 'API fout');
 
+        if (!res.ok) {
+          consecutiveErrors++;
+          if (consecutiveErrors >= MAX_ERRORS) {
+            bulkRunning = false;
+            setStatus('m-status', 'Bulk gestopt na ' + MAX_ERRORS + ' opeenvolgende fouten: ' + (data.error || 'API fout'), 'error');
+            break;
+          }
+          setStatus('m-status', 'Tijdelijke fout (' + consecutiveErrors + '/' + MAX_ERRORS + ') — opnieuw proberen…', 'warn');
+          await new Promise(r => setTimeout(r, 3000 * consecutiveErrors));
+          continue;
+        }
+
+        consecutiveErrors = 0;
         (data.results || []).forEach(r => addResultItem(r));
 
         completed = data.completed || [];
-        const pct = urls.length ? Math.round(completed.length / urls.length * 100) : 0;
+        const pct = totalCount ? Math.round(completed.length / totalCount * 100) : 0;
         document.getElementById('m-progress-fill').style.width = pct + '%';
-        document.getElementById('m-progress-label').textContent = completed.length + ' van ' + urls.length + ' pagina\\'s verwerkt';
+        document.getElementById('m-progress-label').textContent = completed.length + ' van ' + totalCount + ' pagina\\'s verwerkt';
 
         if (data.done) {
           bulkRunning = false;
@@ -6987,9 +7527,14 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
           break;
         }
       } catch (err) {
-        bulkRunning = false;
-        setStatus('m-status', 'Fout: ' + err.message, 'error');
-        break;
+        consecutiveErrors++;
+        if (consecutiveErrors >= MAX_ERRORS) {
+          bulkRunning = false;
+          setStatus('m-status', 'Bulk gestopt na ' + MAX_ERRORS + ' opeenvolgende fouten: ' + err.message, 'error');
+          break;
+        }
+        setStatus('m-status', 'Tijdelijke fout (' + consecutiveErrors + '/' + MAX_ERRORS + ') — opnieuw proberen…', 'warn');
+        await new Promise(r => setTimeout(r, 3000 * consecutiveErrors));
       }
     }
 
@@ -7001,13 +7546,25 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     const list = document.getElementById('m-results');
     const item = document.createElement('div');
     item.className = 'result-item';
+    const rawMd = r.success ? (r.content || '') : '';
+    const bodyContent = r.success ? renderMd(rawMd) : escHtml(r.error || 'Onbekende fout');
     item.innerHTML = \`
       <div class="result-item-header" onclick="toggleResult(this)">
         <div class="result-dot \${r.success ? 'ok' : 'err'}"></div>
         <div class="result-url">\${r.url}</div>
         <span style="color:var(--mid-grey);font-size:12px">\${r.success ? '✓ Gegenereerd' : '✗ Mislukt'} — klik om te bekijken</span>
       </div>
-      <div class="result-body">\${r.success ? (r.content || '') : (r.error || 'Onbekende fout')}</div>\`;
+      <div class="result-body" data-raw="\${escHtml(rawMd)}">\${bodyContent}</div>\`;
+    // Kopieer-knop en raw-toggle per resultaat
+    if (r.success) {
+      const header = item.querySelector('.result-item-header');
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn-secondary';
+      copyBtn.style.cssText = 'padding:3px 10px;font-size:11px;margin-left:auto;flex-shrink:0';
+      copyBtn.textContent = 'Kopieer';
+      copyBtn.onclick = e => { e.stopPropagation(); navigator.clipboard.writeText(rawMd); copyBtn.textContent = '✓'; setTimeout(() => copyBtn.textContent = 'Kopieer', 1500); };
+      header.appendChild(copyBtn);
+    }
     list.appendChild(item);
   }
   function toggleResult(header) {
@@ -7229,7 +7786,17 @@ function lcGenFrontendMigratieTab(base, cmsLabel, hasCms) {
         <strong>Gebruik dit voor:</strong> het herschrijven van een complete website of een sectie. De agent werkt door de lijst heen en toont per batch de voortgang. Je kunt hem tussendoor stoppen.
       </div>
 
-      <div class="form-row">
+      <div id="m-sheet-selector" style="display:none">
+        <div class="bulk-toolbar">
+          <button class="btn-secondary" onclick="toggleAllPages(true)">Alles</button>
+          <button class="btn-secondary" onclick="toggleAllPages(false)">Geen</button>
+          <input type="text" id="m-page-filter" placeholder="Filter op URL of template…" oninput="filterBulkPages(this.value)" />
+          <span class="sel-count" id="m-sel-count"></span>
+        </div>
+        <div class="page-list" id="m-page-list"></div>
+        <div class="hint" style="margin-top:8px">Zoekwoorden en template komen per pagina uit het planningssheet.</div>
+      </div>
+      <div class="form-row" id="m-urls-wrap">
         <label>URL's om te herschrijven</label>
         <div class="hint">Één URL per regel.</div>
         <textarea id="m-urls" class="mono" rows="6" placeholder="${base}/diensten&#10;${base}/diensten/voorbeeld-dienst&#10;${base}/over-ons"></textarea>
@@ -7242,7 +7809,7 @@ function lcGenFrontendMigratieTab(base, cmsLabel, hasCms) {
           <button class="btn-opt" data-value="overig" onclick="selectMigratePagetype(this)">Overig</button>
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row" id="m-keywords-row">
         <label>Zoekwoorden (optioneel, voor alle pagina's)</label>
         <input type="text" id="m-keywords" placeholder="primair zoekwoord, secundair zoekwoord" />
       </div>

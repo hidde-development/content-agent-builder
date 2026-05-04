@@ -52,7 +52,12 @@ Voorbeeld boekhouder:
     "productpagina": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"],
     "artikelpagina": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"],
     "case": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"],
-    "social-proof": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"]
+    "social-proof": ["aanvullende vraag specifiek voor dit type pagina bij deze klant"],
+    "social-b2c": ["aanvullende vraag voor Instagram/Facebook-content bij deze klant"],
+    "social-video-b2c": ["aanvullende vraag voor TikTok-scripts bij deze klant"],
+    "social-b2b": ["aanvullende vraag voor LinkedIn-content bij deze klant"],
+    "landingspagina-ecommerce": ["aanvullende vraag voor e-commerce landingspagina's bij deze klant"],
+    "nieuwsbrief": ["aanvullende vraag voor nieuwsbrieven/mailings bij deze klant"]
   }
 }
 
@@ -125,7 +130,7 @@ module.exports = async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.Claude,
+        'x-api-key': process.env.Claude ?? process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
