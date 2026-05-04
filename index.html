@@ -7085,16 +7085,19 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   }
 
   // Minimale markdown → HTML renderer (geen externe afhankelijkheid)
+  // NB: deze functie staat in de outer template literal van lcGenFrontend(),
+  //     dus alle \\n, \\s, \\d, \\* zijn DUBBEL ge-escaped — anders eet de
+  //     template literal de eerste backslash en wordt de regex ongeldig.
   function renderMd(md) {
     if (!md) return '';
     const safe = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const inline = s => safe(s)
-      .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
-      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-      .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
-      .replace(/\`([^\`\n]+?)\`/g,'<code>$1</code>');
+      .replace(/\\*\\*\\*(.+?)\\*\\*\\*/g,'<strong><em>$1</em></strong>')
+      .replace(/\\*\\*(.+?)\\*\\*/g,'<strong>$1</strong>')
+      .replace(/\\*([^*\\n]+?)\\*/g,'<em>$1</em>')
+      .replace(/\`([^\`\\n]+?)\`/g,'<code>$1</code>');
 
-    const lines = md.split('\n');
+    const lines = md.split('\\n');
     const out = [];
     let inUl = false, inOl = false, pBuf = [];
 
@@ -7106,18 +7109,18 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     for (const raw of lines) {
       const t = raw.trim();
       if (!t) { flushP(); closeLists(); continue; }
-      const hm = t.match(/^(#{1,4})\s+(.+)/);
+      const hm = t.match(/^(#{1,4})\\s+(.+)/);
       if (hm) { flushP(); closeLists(); out.push('<h' + hm[1].length + '>' + inline(hm[2]) + '</h' + hm[1].length + '>'); continue; }
       if (/^---+$/.test(t)) { flushP(); closeLists(); out.push('<hr>'); continue; }
-      const ulm = t.match(/^[-*]\s+(.*)/);
+      const ulm = t.match(/^[-*]\\s+(.*)/);
       if (ulm) { flushP(); closeOl(); if (!inUl) { out.push('<ul>'); inUl = true; } out.push('<li>' + inline(ulm[1]) + '</li>'); continue; }
-      const olm = t.match(/^\d+\.\s+(.*)/);
+      const olm = t.match(/^\\d+\\.\\s+(.*)/);
       if (olm) { flushP(); closeUl(); if (!inOl) { out.push('<ol>'); inOl = true; } out.push('<li>' + inline(olm[1]) + '</li>'); continue; }
       closeLists();
       pBuf.push(inline(t));
     }
     flushP(); closeLists();
-    return out.join('\n');
+    return out.join('\\n');
   }
 
   let _rawMode = false;
@@ -7346,7 +7349,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       }
       const warns = [];
       if (data.sourceWarnings && data.sourceWarnings.length) {
-        warns.push('⚠ ' + data.sourceWarnings.length + ' bronpagina' + (data.sourceWarnings.length > 1 ? '\'s' : '') + ' niet bereikbaar (403/bot-block): ' + data.sourceWarnings.join(', '));
+        warns.push('⚠ ' + data.sourceWarnings.length + ' bronpagina' + (data.sourceWarnings.length > 1 ? '\\'s' : '') + ' niet bereikbaar (403/bot-block): ' + data.sourceWarnings.join(', '));
       }
       if (data.reviewWarning) {
         warns.push('⚠ ' + data.reviewWarning);
