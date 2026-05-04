@@ -1513,7 +1513,7 @@ function handleFiles(fileList) {
 
   Array.from(fileList).forEach(file => {
     if (file.size > 3 * 1024 * 1024) {
-      status.textContent = `"${file.name}" is te groot (max. 3 MB)`;
+      status.textContent = `"${file.name}" is te groot (max. 3 MB). Grote brand guides: exporteer alleen de tekst-secties als PDF, of plak de relevante tekst in een .txt-bestand.`;
       status.className = 'analyse-status error';
       return;
     }

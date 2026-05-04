@@ -91,11 +91,11 @@ module.exports = async function handler(req, res) {
 
   // Build message content for Claude
   const content = [];
-  // Per-bestand cap: ~10K tokens voor tekst. PDFs worden afgekapt op 1.5MB (base64).
+  // Tekst-bestanden worden per bestand én in totaal afgekapt om grote payloads te voorkomen.
+  // PDFs worden nooit afgekapt — base64 halverwege knippen maakt het bestand corrupt.
+  // De frontend begrenst uploads al op 3 MB per bestand, wat de invoer praktisch beperkt.
   const MAX_TEXT_PER_FILE = 40000;
-  const MAX_PDF_B64_CHARS  = 2_000_000; // ~1.5 MB raw PDF
-  // Totaallimiet over alle tekst-bestanden samen (voorkomt timeout bij veel bestanden).
-  const MAX_TOTAL_TEXT     = 100_000;
+  const MAX_TOTAL_TEXT    = 100_000;
   let totalTextChars = 0;
 
   for (const file of files) {
@@ -103,17 +103,12 @@ module.exports = async function handler(req, res) {
     if (file.name && file.name.toLowerCase().endsWith('.xml')) continue;
 
     if (file.mediaType === 'application/pdf') {
-      const pdfData = String(file.data || '');
-      // Afkappen als PDF-base64 te groot is (beschermt tegen gigantische PDFs)
-      const truncatedPdf = pdfData.length > MAX_PDF_B64_CHARS
-        ? pdfData.slice(0, MAX_PDF_B64_CHARS)
-        : pdfData;
       content.push({
         type: 'document',
         source: {
           type: 'base64',
           media_type: 'application/pdf',
-          data: truncatedPdf,
+          data: String(file.data || ''),
         },
         title: file.name,
       });
