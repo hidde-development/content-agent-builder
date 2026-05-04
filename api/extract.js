@@ -91,29 +91,44 @@ module.exports = async function handler(req, res) {
 
   // Build message content for Claude
   const content = [];
-  const MAX_TEXT_PER_FILE = 80000; // ~20K tokens — voorkomt Vercel 60s-timeout op grote MD/TXT
+  // Per-bestand cap: ~10K tokens voor tekst. PDFs worden afgekapt op 1.5MB (base64).
+  const MAX_TEXT_PER_FILE = 40000;
+  const MAX_PDF_B64_CHARS  = 2_000_000; // ~1.5 MB raw PDF
+  // Totaallimiet over alle tekst-bestanden samen (voorkomt timeout bij veel bestanden).
+  const MAX_TOTAL_TEXT     = 100_000;
+  let totalTextChars = 0;
 
   for (const file of files) {
     // Skip XML/sitemaps server-side als ze toch zijn doorgekomen — dragen niet bij aan brand-extractie
     if (file.name && file.name.toLowerCase().endsWith('.xml')) continue;
 
     if (file.mediaType === 'application/pdf') {
+      const pdfData = String(file.data || '');
+      // Afkappen als PDF-base64 te groot is (beschermt tegen gigantische PDFs)
+      const truncatedPdf = pdfData.length > MAX_PDF_B64_CHARS
+        ? pdfData.slice(0, MAX_PDF_B64_CHARS)
+        : pdfData;
       content.push({
         type: 'document',
         source: {
           type: 'base64',
           media_type: 'application/pdf',
-          data: file.data,
+          data: truncatedPdf,
         },
         title: file.name,
       });
     } else {
+      // Stop als totaallimiet al bereikt is
+      if (totalTextChars >= MAX_TOTAL_TEXT) continue;
       let text = String(file.data || '');
       let truncatedNote = '';
-      if (text.length > MAX_TEXT_PER_FILE) {
-        text = text.slice(0, MAX_TEXT_PER_FILE);
-        truncatedNote = `\n\n[…afgekapt op ${MAX_TEXT_PER_FILE} tekens — origineel was ${file.data.length}]`;
+      const remainingBudget = MAX_TOTAL_TEXT - totalTextChars;
+      const cap = Math.min(MAX_TEXT_PER_FILE, remainingBudget);
+      if (text.length > cap) {
+        text = text.slice(0, cap);
+        truncatedNote = `\n\n[…afgekapt op ${cap} tekens — origineel was ${file.data.length}]`;
       }
+      totalTextChars += text.length;
       content.push({
         type: 'text',
         text: `--- Bestand: ${file.name} ---\n${text}${truncatedNote}`,
@@ -124,6 +139,8 @@ module.exports = async function handler(req, res) {
   content.push({ type: 'text', text: EXTRACTION_PROMPT });
 
   // Call Anthropic API
+  // claude-haiku-3-5 is 5–10× sneller dan Sonnet voor extractie-taken
+  // en levert gelijkwaardige JSON-kwaliteit op brand-documenten.
   let apiResponse;
   try {
     apiResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -134,8 +151,8 @@ module.exports = async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8192,
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 4096,
         messages: [{ role: 'user', content }],
       }),
     });
