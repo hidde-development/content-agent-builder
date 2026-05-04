@@ -7454,10 +7454,6 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     header.nextElementSibling.classList.toggle('open');
   }
 
-  function escHtml(s) {
-    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
   async function publishPage(btn) {
     if (!lastPage) { setStatus('w-status', 'Geen pagina om te publiceren.', 'error'); return; }
     if (lastVerdict === 'red') { setStatus('w-status', 'Rode output kan niet gepubliceerd worden.', 'error'); return; }
