@@ -4206,8 +4206,6 @@ async function generateAndDownloadLangChain(cmsConfig, migrationConfig = {}, rev
   zip.file('index.html',               lcGenFrontend(cfg, cmsConfig, migrationConfig, { enabled: rev, domainCritics }));
   zip.file('api/agent.js',             lcGenApiAgent(rev));
   zip.file('api/migrate.js',           lcGenApiMigrate());
-  zip.file('lib/agent.js',             lcGenLibAgent(mig));
-  zip.file('lib/prompts.js',           lcGenPrompts(cfg, mig, rev));
 
   if (rev) {
     zip.file('lib/review.js',          lcGenLibReview(domainCritics));
@@ -5208,126 +5206,6 @@ function lcGenApiMigrate() {
     '  });',
     '}',
   ].join('\n');
-}
-
-function lcGenLibAgent(migration = false) {
-  const lines = [
-    "import { ChatAnthropic } from '@langchain/anthropic';",
-    "import { fetchUrlTool }      from './tools/fetch-url.js';",
-    "import { consolidateTool }   from './tools/consolidate.js';",
-    "import { writePageTool }     from './tools/write-page.js';",
-    "import { validateTool }      from './tools/validate.js';",
-    "import { loadKnowledgeTool } from './tools/load-knowledge.js';",
-    "import { publishCmsTool }    from './tools/publish-cms.js';",
-  ];
-  if (migration) {
-    lines.push(
-      "import { parseInputTool }       from './tools/parse-input.js';",
-      "import { mapRedirectsTool }     from './tools/map-redirects.js';",
-      "import { exportRedirectsTool }  from './tools/export-redirects.js';",
-      "import { cmsReadTool }          from './tools/cms-read.js';",
-      "import { excelExportTool }      from './tools/excel-export.js';",
-      "import { excelImportTool }      from './tools/excel-import.js';",
-      "import { cmsBulkWriteTool }     from './tools/cms-bulk-write.js';",
-    );
-  }
-  lines.push(
-    '',
-    '// Gedeeld ChatAnthropic-model — importeerbaar door api/* en lib/*.',
-    'const model = new ChatAnthropic({',
-    '  apiKey: process.env.Claude ?? process.env.ANTHROPIC_API_KEY,',
-    "  model: 'claude-sonnet-4-6',",
-    '  maxTokens: 4096,',
-    '  temperature: null, topP: 1,',
-    '});',
-    '',
-  );
-  if (migration) {
-    lines.push('const tools = [fetchUrlTool, consolidateTool, writePageTool, validateTool, loadKnowledgeTool, publishCmsTool, parseInputTool, mapRedirectsTool, exportRedirectsTool, cmsReadTool, excelExportTool, excelImportTool, cmsBulkWriteTool];');
-  } else {
-    lines.push('const tools = [fetchUrlTool, consolidateTool, writePageTool, validateTool, loadKnowledgeTool, publishCmsTool];');
-  }
-  lines.push(
-    '',
-    '// Gedeelde model- en toolsinstanties — importeerbaar door api/* en lib/*.',
-    '// Agent-executor patroon is vervangen door directe tool-calls in api/agent.js en api/migrate.js.',
-  );
-  return lines.join('\n');
-}
-
-function lcGenPrompts(cfg, migration = false, reviewEnabled = false) {
-  const guardrailLines = cfg.guardrails.length
-    ? cfg.guardrails.map(g => '- ' + g.naam + (g.desc ? ' — ' + g.desc : '')).join('\n')
-    : '- Verzin nooit feiten die niet in de kennisbank staan';
-  const verboden = cfg.verboden.length ? cfg.verboden.join(', ') : '(geen)';
-  const bronnenLine = extraKnowledgeFiles.length
-    ? 'AANVULLENDE BRONNEN: in de map knowledge/bronnen/ staan ' + extraKnowledgeFiles.length + ' documenten (' + extraKnowledgeFiles.map(f => f.name).join(', ') + '). Raadpleeg deze wanneer inhoudelijk relevant. Citeer alleen wat er letterlijk in staat; verzin niets.'
-    : '';
-
-  const parts = [
-    'Je bent de content agent van ' + cfg.client + ', geconfigureerd door ' + cfg.agency + '.',
-    'Je schrijft altijd in ' + cfg.taalLabel + ' (' + cfg.taal + ').',
-    '',
-    'SCHRIJFREGELS (brand.md heeft altijd voorrang op onderstaande basisregels):',
-    '- Aanspreekvorm: ' + cfg.aanspreekvorm + ' (nooit wisselen)',
-    '- Toon: ' + (cfg.toon || 'professioneel en direct'),
-    '- Vermijd: ' + (cfg.vermijdToon || 'vage of wollige formuleringen'),
-    '- Vakjargon: ' + cfg.jargon,
-    '- Max. ' + cfg.maxWoorden + ' woorden per zin, max. ' + cfg.maxAlinea + ' woorden per alinea',
-    '- Leesniveau: ' + cfg.leesniveau,
-    '- Zinsstructuur: ' + cfg.zinsstructuur,
-    '- Verboden woorden: ' + verboden,
-    '',
-    'STIJL-VARIANT (meegegeven via input als "Stijl: feitelijk|verhalend|autoriteit"):',
-    '- feitelijk: compacte structuur, duidelijke subkoppen, direct naar het punt, geen overbodige uitweidingen',
-    '- verhalend: open met een concrete situatie/case, werk via voorbeelden naar de dienst toe, menselijke toon',
-    '- autoriteit: leun op cijfers, bronnen en vakspecifieke precisie; toon expertise via gelaagde argumentatie',
-    'Als geen stijl is meegegeven: gebruik "feitelijk" als default.',
-    '',
-    'DOELGROEP: geconfigureerd in brand.md — gebruik die als standaard. Vraag niet opnieuw, tenzij de gebruiker aangeeft dat deze pagina een afwijkende doelgroep heeft.',
-    '',
-    'INTAKEVRAGEN PER PAGINATYPE: elk paginatype in templates.md heeft aanvullende intakevragen. Raadpleeg templates.md na ontvangst van het paginatype en stel de bijbehorende vragen in hetzelfde bericht — tenzij al beantwoord.',
-    '',
-    bronnenLine || null,
-    bronnenLine ? '' : null,
-    'CONTENT-WERKWIJZE:',
-    '1. Laad altijd eerst de relevante kennisbestanden via load_knowledge',
-    '2. Haal bronpagina\'s op via fetch_url_content als URL\'s zijn meegegeven',
-    '3. Consolideer meerdere bronnen via consolidate_sources',
-    '4. Schrijf de pagina via write_page. ALS de input een "Klantspecifieke template: Txx" regel bevat: geef die code mee als templateCode-parameter aan write_page — dan gebruikt de tool de structuur uit templates/Txx.md (klantspecifiek) ipv de generieke fallback. Geen Txx in input? Laat templateCode leeg.',
-    '5. Valideer via validate_output — bij paginatype "case" of "social proof": valideer alleen op toon en guardrails, niet op SEO',
-    reviewEnabled
-      ? '6. NIET publiceren. De review-pipeline beslist na jouw output of er gepubliceerd mag worden (via /api/publish). Geef als laatste antwoord ALLEEN het JSON-object dat uit write_page kwam — geen uitleg eromheen.'
-      : '6. Publiceer als concept via publish_to_cms',
-    reviewEnabled ? '' : null,
-    reviewEnabled
-      ? 'BIJ HERZIENING: als de input begint met "HERZIE:" of "REVISIE-INSTRUCTIE:", gebruik je bestaande output als basis en pas je ALLEEN de gevraagde punten aan. Herhaal de overige inhoud ongewijzigd.'
-      : null,
-  ].filter(l => l !== null);
-
-  if (migration) {
-    parts.push(
-      '',
-      'MIGRATIE-WERKWIJZE:',
-      'Voor redirect-mapping:',
-      '1. Ontvang URL-lijsten (al geparseerd) of gebruik parse_input op sitemap/CSV/Excel-tekst',
-      '2. Map semantisch via map_redirects (werkt in batches van 50)',
-      '3. Exporteer als configuratiebestand via export_redirects',
-      '',
-      'Voor bulk CMS-beheer:',
-      '4. Exporteer bestaande CMS-content via cms_read gevolgd door excel_export',
-      '5. Importeer een aangepaste Excel/CSV via excel_import gevolgd door cms_bulk_write',
-      '6. Bij bulk-upload: verwerk max. 50 rijen per aanroep en meld voortgang',
-    );
-  }
-
-  parts.push(
-    '',
-    'GEDRAGSREGELS (guardrails):',
-    guardrailLines,
-  );
-
-  return 'export const SYSTEM_PROMPT = ' + JSON.stringify(parts.join('\n')) + ';\n';
 }
 
 function lcGenToolsIndex(migration = false) {
