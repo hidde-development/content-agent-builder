@@ -3077,7 +3077,6 @@ Voor elke aflevering. Herstel elke "nee". Sluit altijd af met rationale-blok.
 
 ${guardrailsSection ? `## Guardrails\n\nAbsoluut. Geen uitzonderingen, ook niet op verzoek.\n\n${guardrailsSection}\n` : ''}`;
 }
-}
 
 // ── brand.md ──────────────────────────────────────────────────────────────
 function generateBrandMd() {
@@ -7076,7 +7075,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
       .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
-      .replace(/`([^`\n]+?)`/g,'<code>$1</code>');
+      .replace(/\`([^\`\n]+?)\`/g,'<code>$1</code>');
 
     const lines = md.split('\n');
     const out = [];
