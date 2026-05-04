@@ -1232,8 +1232,8 @@
     </div>
 
     <div class="field">
-      <label>Hoofdpagina's van de website</label>
-      <div class="hint">De navigatiestructuur van de site — één URL per regel. Denk aan: homepage, over ons, werkwijze, diensten-overzicht, contact, kennisbank. <strong>Niet</strong> de individuele product- of dienstpagina's (die vul je in bij Productcatalogus). 10–15 URL's is genoeg. Sneller: sitemap-URL hieronder invullen en ophalen.</div>
+      <label>Navigatie-URL's</label>
+      <div class="hint">De <strong>structurele</strong> pagina's van de site — homepage, over ons, werkwijze, diensten-overzicht, contact, kennisbank. <strong>Niet</strong> de individuele product- of dienstpagina's — die voer je in bij Productcatalogus hieronder, en worden automatisch meegenomen voor interne linking. 5–10 navigatie-URL's is genoeg.</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <input type="text" id="sitemap-fetch-url" placeholder="https://www.voorbeeld.nl — of sitemap.xml, of robots.txt" style="flex:1;font-size:13px;font-family:monospace" />
         <button type="button" class="btn-option" onclick="fetchSitemapFromUrl(this)" style="white-space:nowrap">↓ Ophalen &amp; invullen</button>
@@ -1286,7 +1286,7 @@
   <!-- Productcatalogus -->
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>Productcatalogus</span></div>
-    <div class="hint" style="margin-bottom:20px">De individuele producten en diensten van de organisatie. Geef elk item een naam, een kernomschrijving én de bijbehorende URL. De agent gebruikt deze URL's voor directe productlinks in content — anders dan de hoofdpagina's hierboven, die de navigatiestructuur vormen.</div>
+    <div class="hint" style="margin-bottom:20px">De individuele producten en diensten van de organisatie — naam, kernomschrijving en URL. De agent gebruikt de omschrijvingen als kennisbron en de URL's voor directe productlinks. <strong>Je hoeft deze URL's niet ook in te voeren bij Navigatie-URL's</strong> — ze worden automatisch meegenomen voor interne linking.</div>
 
     <div class="paired-list" id="paired-producten"></div>
     <button class="btn-add" style="margin-top:8px" onclick="addPairedItem('producten')">+ Product / dienst toevoegen</button>
@@ -1770,7 +1770,7 @@ async function handleSheetUpload(file) {
     // navigatie-structuur (Level 0+1). Beter dan een rommelige sitemap.xml.
     applySheetMainUrls(false);
     // Auto-fill merktermen met entiteiten uit de ENTITEITEN-tab van de sheet.
-    applySheetEntiteiten(false);
+    applySheetEntiteiten(true); // Excel is leidend: overschrijft altijd AI-gevulde merktermen
   } catch (err) {
     parsedSheet = null;
     status.className = 'analyse-status error';
@@ -2313,8 +2313,11 @@ function applyFields(fields) {
       document.getElementById('chips-' + id)?.classList.add('ai-filled');
     }
   });
-  // Merktermen
-  if (Array.isArray(fields.merktermen) && fields.merktermen.length) {
+  // Merktermen — alleen vullen als er GEEN sheet-entiteiten zijn.
+  // Als een Excel-bestand met ENTITEITEN-tab is geüpload, is dat altijd leidend
+  // en mag de AI-extractie die niet overschrijven.
+  const hasSheetEntiteiten = !!(parsedSheet && parsedSheet.entiteiten && parsedSheet.entiteiten.terms.length);
+  if (!hasSheetEntiteiten && Array.isArray(fields.merktermen) && fields.merktermen.length) {
     pairedData['merktermen'] = fields.merktermen.map(m => ({ naam: m.term || m.naam || '', desc: m.uitleg || m.desc || '', url: '' }));
     renderPaired('merktermen');
   }
@@ -3169,8 +3172,22 @@ function generateSeoMd() {
   const urlTypeNote = isNieuw
     ? 'Onderstaande URL\'s zijn TOEKOMSTIG (nieuwe site / migratie). Schrijf alsof ze al bestaan.'
     : 'Onderstaande URL\'s zijn LIVE.';
-  const urlListSection = sitemapUrls.length
-    ? `\n## Hoofdpagina's voor interne linking\n\n${urlTypeNote}\n\nGebruik als ankerpunt. Kies meest inhoudelijk relevante URL.\n\n${sitemapUrls.map(u => `- ${u}`).join('\n')}\n`
+
+  // Product/dienst-URL's meenemen vanuit de Productcatalogus — zo hoeft de gebruiker
+  // deze URL's niet ook nog in de navigatielijst te zetten.
+  const productenUrls = (getPaired('producten') || [])
+    .filter(p => p.url && p.url.trim())
+    .map(p => `- ${p.url.trim()}${p.naam ? ` (${p.naam})` : ''}`);
+
+  const navSection = sitemapUrls.length
+    ? `\n### Navigatie\n\n${sitemapUrls.map(u => `- ${u}`).join('\n')}\n`
+    : '';
+  const productenLinkSection = productenUrls.length
+    ? `\n### Producten & diensten\n\n${productenUrls.join('\n')}\n`
+    : '';
+
+  const urlListSection = (navSection || productenLinkSection)
+    ? `\n## Hoofdpagina's voor interne linking\n\n${urlTypeNote}\n\nGebruik als ankerpunt. Kies meest inhoudelijk relevante URL.${navSection}${productenLinkSection}`
     : '';
   return `# SEO & GEO
 
