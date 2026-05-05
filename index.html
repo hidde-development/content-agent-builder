@@ -953,7 +953,7 @@
       Upload je stijldocumenten — merkdocument, schrijfwijzer, tone of voice — en wij vullen de velden hieronder automatisch in op basis van de inhoud.
     </p>
     <div style="font-size:13px;background:var(--off-white);border-left:3px solid var(--purple);padding:10px 14px;border-radius:4px;margin-bottom:20px;color:var(--dark-grey);line-height:1.6">
-      <strong style="color:var(--near-black)">Let op:</strong> deze bestanden worden gebruikt voor analyse. Upload ze daarna <strong>ook als kennisbijlage</strong> in je Custom GPT of Copilot — de agent heeft ze nodig om accuraat te schrijven.
+      <strong style="color:var(--near-black)">Hoe deze bestanden gebruikt worden:</strong> de inhoud wordt geanalyseerd en omgezet naar gestructureerde markdown (brand.md, knowledge.md, …). Die markdown is de complete brandvoice-spec voor de agent — de originele bestanden hoeven niet mee. Alleen bij een Custom GPT of Copilot kun je de originelen optioneel als extra kennisbijlage uploaden voor meer nuance; bij de LangChain-agent is dat niet nodig.
     </div>
 
     <div class="upload-zone" id="upload-zone">
@@ -2871,8 +2871,11 @@ function pairedToMd(id) {
   return items.map(p => `**${p.naam}** — ${p.desc}`).join('\n');
 }
 function stijldocToMd() {
-  if (!uploadedFiles.length) return '_Geen stijldocumenten geüpload — voeg ze toe als bijlage in je Custom GPT_';
-  return uploadedFiles.map(f => `- **${f.name}** — raadpleeg voor details die niet in de samenvatting staan`).join('\n');
+  // Deze sectie verschijnt in brand.md. De inhoud van de geüploade bestanden
+  // is al geëxtraheerd naar de andere brand.md-secties; deze lijst dient
+  // alleen als provenance/audit-trail (welke bronnen lagen aan deze spec ten grondslag).
+  if (!uploadedFiles.length) return '_Geen brondocumenten geüpload — deze brandvoice-spec is volledig handmatig samengesteld._';
+  return uploadedFiles.map(f => `- ${f.name}`).join('\n');
 }
 
 // ── SETUP.md ──────────────────────────────────────────────────────────────
@@ -3154,7 +3157,7 @@ function generateBrandMd() {
 
   const stijlBody = stijldocToMd();
   const stijlSection = stijlBody
-    ? `\n## Stijldocumenten\n\nRaadpleeg vóór schrijven. Ontbrekend → melden en wachten.\n\n${stijlBody}\n`
+    ? `\n## Brondocumenten (provenance)\n\nDeze brandvoice-spec is geëxtraheerd uit onderstaande documenten. De inhoud is verwerkt in deze brand.md — de originele bestanden zelf zijn niet meer nodig om te schrijven.\n\n${stijlBody}\n`
     : '';
 
   return `# ${client} — Merkprofiel
