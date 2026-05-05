@@ -949,12 +949,9 @@
   <div class="section-card">
     <div class="section-label"><div class="section-square"></div><span>Automatisch invullen</span></div>
 
-    <p style="font-size:14px;color:var(--dark-grey);margin-bottom:16px;line-height:1.6">
+    <p style="font-size:14px;color:var(--dark-grey);margin-bottom:20px;line-height:1.6">
       Upload je stijldocumenten — merkdocument, schrijfwijzer, tone of voice — en wij vullen de velden hieronder automatisch in op basis van de inhoud.
     </p>
-    <div style="font-size:13px;background:var(--off-white);border-left:3px solid var(--purple);padding:10px 14px;border-radius:4px;margin-bottom:20px;color:var(--dark-grey);line-height:1.6">
-      <strong style="color:var(--near-black)">Hoe deze bestanden gebruikt worden:</strong> de inhoud wordt geanalyseerd en omgezet naar gestructureerde markdown (brand.md, knowledge.md, …). Die markdown is de complete brandvoice-spec voor de agent — de originele bestanden hoeven niet mee. Alleen bij een Custom GPT of Copilot kun je de originelen optioneel als extra kennisbijlage uploaden voor meer nuance; bij de LangChain-agent is dat niet nodig.
-    </div>
 
     <div class="upload-zone" id="upload-zone">
       <input type="file" id="file-input" multiple accept=".pdf,.txt,.md,.docx,.xml" onchange="handleFiles(this.files)" />
