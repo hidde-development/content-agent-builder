@@ -4501,12 +4501,13 @@ function lcGenApiAgent(reviewEnabled = false) {
     '}',
     '',
     '// Bronpagina\'s ophalen + consolideren tot één werkbare brief.',
-    '// Retourneert { brief, failed } — failed bevat URLs die niet bereikbaar waren (403/timeout).',
+    '// Retourneert { brief, failed, consolidateFailed }.',
     '// Geen sources → brief blijft zoals hij is.',
     '// 1 source  → bronpagina als context aan brief toegevoegd.',
     '// 2+ sources → consolidate_sources samenvatting + brief als aanvulling.',
+    '//             Bij consolidate-fout: fallback op simpele concatenatie (verlies geen content).',
     'async function prepareBrief({ brief, sources, pageType, url }) {',
-    '  if (!sources || !sources.length) return { brief: brief || "", failed: [] };',
+    '  if (!sources || !sources.length) return { brief: brief || "", failed: [], consolidateFailed: false };',
     '  const fetched = [];',
     '  const failed = [];',
     '  for (const u of sources) {',
@@ -4516,16 +4517,20 @@ function lcGenApiAgent(reviewEnabled = false) {
     '      else failed.push(u);',
     '    } catch (_) { failed.push(u); }',
     '  }',
-    '  if (fetched.length >= 2) {',
-    '    try {',
-    '      const c = JSON.parse(await consolidateTool.func({ sources: fetched, topic: pageType + " over " + url }));',
-    '      if (c.success) return { brief: c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed };',
-    '    } catch (_) {}',
-    '  }',
+    '  if (fetched.length === 0) return { brief: brief || "", failed, consolidateFailed: false };',
     '  if (fetched.length === 1) {',
-    '    return { brief: "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed };',
+    '    return { brief: "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed, consolidateFailed: false };',
     '  }',
-    '  return { brief: brief || "", failed };',
+    '  // 2+ gefetcht → probeer consolideren',
+    '  let consolidateFailed = false;',
+    '  try {',
+    '    const c = JSON.parse(await consolidateTool.func({ sources: fetched, topic: pageType + " over " + url }));',
+    '    if (c.success) return { brief: c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed, consolidateFailed: false };',
+    '    consolidateFailed = true;',
+    '  } catch (_) { consolidateFailed = true; }',
+    '  // Fallback: concateneer ruwe content zodat de writer iets heeft om mee te werken.',
+    '  const concatenated = fetched.map(f => "## " + (f.title || f.url) + "\\n" + f.content).join("\\n\\n---\\n\\n");',
+    '  return { brief: "Bronpagina\'s (consolidatie mislukt — ruwe inhoud):\\n\\n" + concatenated + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed, consolidateFailed };',
     '}',
     '',
     '// write_page direct aanroepen (niet via agent.invoke). Voorkomt schema-mismatches:',
@@ -4556,9 +4561,12 @@ function lcGenApiAgent(reviewEnabled = false) {
       '  const safeSources  = Array.isArray(sources) ? sources.slice(0, 5) : [];',
       '',
       '  try {',
-      '    const { brief: enrichedBrief, failed: sourcesFailed } = await prepareBrief({ brief: safeBrief, sources: safeSources, pageType, url });',
+      '    const { brief: enrichedBrief, failed: sourcesFailed, consolidateFailed } = await prepareBrief({ brief: safeBrief, sources: safeSources, pageType, url });',
       '    const page = await callWritePage({ brief: enrichedBrief, pageType, url, keywords: safeKeywords, templateCode, style });',
-      '    return res.status(200).json({ success: true, content: page.content, page, style, ...(sourcesFailed.length ? { sourceWarnings: sourcesFailed } : {}) });',
+      '    const warnings = [];',
+      '    if (sourcesFailed.length) warnings.push("Niet bereikbare bronpagina\'s (403/timeout/DNS): " + sourcesFailed.join(", "));',
+      '    if (consolidateFailed) warnings.push("Consolidatie van bronpagina\'s mislukt — ruwe inhoud is gebruikt in plaats van AI-samenvatting.");',
+      '    return res.status(200).json({ success: true, content: page.content, page, style, ...(warnings.length ? { warnings } : {}), ...(sourcesFailed.length ? { sourceWarnings: sourcesFailed } : {}) });',
       '  } catch (err) {',
       '    return res.status(500).json({ success: false, error: err.message });',
       '  }',
@@ -4583,7 +4591,7 @@ function lcGenApiAgent(reviewEnabled = false) {
     '',
     '  try {',
     '    // 1. Brief verrijken (sources fetch + consolidate)',
-    '    const { brief: enrichedBrief, failed: sourcesFailed } = await prepareBrief({ brief: safeBrief, sources: safeSources, pageType, url });',
+    '    const { brief: enrichedBrief, failed: sourcesFailed, consolidateFailed } = await prepareBrief({ brief: safeBrief, sources: safeSources, pageType, url });',
     '',
     '    // 2. Writer → v1',
     '    const pageV1 = await callWritePage({ brief: enrichedBrief, pageType, url, keywords, templateCode, style });',
@@ -4601,6 +4609,7 @@ function lcGenApiAgent(reviewEnabled = false) {
     '    let finalPage = pageV1;',
     '    let finalContent = contentV1;',
     '    let revised = false;',
+    '    let reviseWarning = null;',
     '',
     '    // 4. Auto-revise bij oranje (max 1x) — alleen als review succesvol was',
     '    if (review && review.verdict === "orange" && review.revisionPrompt) {',
@@ -4610,8 +4619,17 @@ function lcGenApiAgent(reviewEnabled = false) {
     '        finalPage = pageV2;',
     '        finalContent = pageV2.content || "";',
     '        revised = true;',
-    '      } catch (_) { /* revise mislukt → lever v1 */ }',
+    '      } catch (reviseErr) {',
+    '        reviseWarning = "Automatische revisie na oranje verdict mislukt — eerste versie geleverd: " + reviseErr.message;',
+    '      }',
     '    }',
+    '',
+    '    // Geaggregeerde warnings — alle silent failures expliciet maken voor de gebruiker.',
+    '    const warnings = [];',
+    '    if (sourcesFailed.length) warnings.push("Niet bereikbare bronpagina\'s (403/timeout/DNS): " + sourcesFailed.join(", "));',
+    '    if (consolidateFailed)    warnings.push("Consolidatie van bronpagina\'s mislukt — ruwe inhoud is gebruikt in plaats van AI-samenvatting.");',
+    '    if (reviewWarning)        warnings.push(reviewWarning);',
+    '    if (reviseWarning)        warnings.push(reviseWarning);',
     '',
     '    return res.status(200).json({',
     '      success: true,',
@@ -4619,6 +4637,8 @@ function lcGenApiAgent(reviewEnabled = false) {
     '      page: finalPage,',
     '      ...(review ? { verdict: review.verdict, reports: review.reports, summary: review.summary, revised } : {}),',
     '      style,',
+    '      ...(warnings.length ? { warnings } : {}),',
+    '      // Legacy compat — frontend kan beide lezen.',
     '      ...(reviewWarning ? { reviewWarning } : {}),',
     '      ...(sourcesFailed.length ? { sourceWarnings: sourcesFailed } : {}),',
     '    });',
@@ -5125,25 +5145,31 @@ function lcGenApiMigrate() {
     '}',
     '',
     '// Bronpagina ophalen en samenvoegen tot een brief (identiek patroon als api/agent.js).',
+    '// Retourneert { brief, failed, consolidateFailed } — silent failures worden zichtbaar gemaakt.',
     'async function prepareBrief({ brief, sources, pageType, url }) {',
-    '  if (!sources || !sources.length) return brief || "";',
+    '  if (!sources || !sources.length) return { brief: brief || "", failed: [], consolidateFailed: false };',
     '  const fetched = [];',
+    '  const failed = [];',
     '  for (const u of sources) {',
     '    try {',
     '      const r = JSON.parse(await fetchUrlTool.func({ url: u }));',
     '      if (r.success) fetched.push({ url: u, title: r.title || "", content: r.content || "" });',
-    '    } catch (_) {}',
+    '      else failed.push(u);',
+    '    } catch (_) { failed.push(u); }',
     '  }',
-    '  if (fetched.length >= 2) {',
-    '    try {',
-    '      const c = JSON.parse(await consolidateTool.func({ sources: fetched, topic: pageType + " over " + url }));',
-    '      if (c.success) return c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : "");',
-    '    } catch (_) {}',
-    '  }',
+    '  if (fetched.length === 0) return { brief: brief || "", failed, consolidateFailed: false };',
     '  if (fetched.length === 1) {',
-    '    return "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : "");',
+    '    return { brief: "Bronpagina:\\n" + fetched[0].content + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed, consolidateFailed: false };',
     '  }',
-    '  return brief || "";',
+    '  let consolidateFailed = false;',
+    '  try {',
+    '    const c = JSON.parse(await consolidateTool.func({ sources: fetched, topic: pageType + " over " + url }));',
+    '    if (c.success) return { brief: c.brief + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed, consolidateFailed: false };',
+    '    consolidateFailed = true;',
+    '  } catch (_) { consolidateFailed = true; }',
+    '  // Fallback: concateneer ruwe content (geen verlies van source-content).',
+    '  const concatenated = fetched.map(f => "## " + (f.title || f.url) + "\\n" + f.content).join("\\n\\n---\\n\\n");',
+    '  return { brief: "Bronpagina\'s (consolidatie mislukt — ruwe inhoud):\\n\\n" + concatenated + (brief ? "\\n\\nAanvullende opdracht:\\n" + brief : ""), failed, consolidateFailed };',
     '}',
     '',
     '// write_page direct aanroepen — geen agent.invoke, voorkomt schema-mismatches.',
@@ -5186,9 +5212,13 @@ function lcGenApiMigrate() {
     '    const effectivePt  = pgTpl || pageType;',
     '    try {',
     '      const brief = "Herschrijf deze pagina volledig op basis van de merkregels en templates.\\nURL: " + url + "\\nPaginatype: " + effectivePt + "\\nZoekwoorden: " + effectiveKw;',
-    '      const enrichedBrief = await prepareBrief({ brief, sources: [url], pageType: effectivePt, url });',
+    '      const { brief: enrichedBrief, failed: pageSourcesFailed, consolidateFailed } = await prepareBrief({ brief, sources: [url], pageType: effectivePt, url });',
     '      const page = await callWritePage({ brief: enrichedBrief, pageType: effectivePt, url, keywords: effectiveKw, templateCode: pgTpl || null });',
-    '      results.push({ url, success: true, content: page.content, page });',
+    '      // Per-pagina warnings — zo blijven silent failures zichtbaar in de bulk-resultaten.',
+    '      const warnings = [];',
+    '      if (pageSourcesFailed.length) warnings.push("Bronpagina niet bereikbaar: " + pageSourcesFailed.join(", "));',
+    '      if (consolidateFailed)        warnings.push("Consolidatie mislukt — ruwe inhoud gebruikt.");',
+    '      results.push({ url, success: true, content: page.content, page, ...(warnings.length ? { warnings } : {}) });',
     '    } catch (err) {',
     '      results.push({ url, success: false, error: err.message });',
     '    }',
@@ -7225,15 +7255,23 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       } else {
         setStatus('w-status', '✓ Pagina gegenereerd. Controleer de inhoud vóór publicatie.', 'success');
       }
-      const warns = [];
-      if (data.sourceWarnings && data.sourceWarnings.length) {
-        warns.push('⚠ ' + data.sourceWarnings.length + ' bronpagina' + (data.sourceWarnings.length > 1 ? '\\'s' : '') + ' niet bereikbaar (403/bot-block): ' + data.sourceWarnings.join(', '));
-      }
-      if (data.reviewWarning) {
-        warns.push('⚠ ' + data.reviewWarning);
+      // Warnings: nieuwe aggregated 'warnings' array heeft voorrang.
+      // Legacy: sourceWarnings + reviewWarning als fallback voor oudere deploys.
+      let warns = [];
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        warns = data.warnings.map(w => '⚠ ' + w);
+      } else {
+        if (data.sourceWarnings && data.sourceWarnings.length) {
+          warns.push('⚠ ' + data.sourceWarnings.length + ' bronpagina' + (data.sourceWarnings.length > 1 ? '\\'s' : '') + ' niet bereikbaar (403/bot-block): ' + data.sourceWarnings.join(', '));
+        }
+        if (data.reviewWarning) {
+          warns.push('⚠ ' + data.reviewWarning);
+        }
       }
       if (warns.length) {
-        setStatus('w-source-warn', warns.join(' | '), 'warn');
+        // Toon elke waarschuwing op een eigen regel — beter leesbaar dan ' | '-separator.
+        setStatus('w-source-warn', warns.join('\\n'), 'warn');
+        document.getElementById('w-source-warn').style.whiteSpace = 'pre-line';
       } else {
         hideStatus('w-source-warn');
       }
@@ -7441,13 +7479,17 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     item.className = 'result-item';
     const rawMd = r.success ? (r.content || '') : '';
     const bodyContent = r.success ? renderMd(rawMd) : escHtml(r.error || 'Onbekende fout');
+    // Per-pagina warnings (bron-fetch faal, consolidate-fout) — apart blokje boven de content.
+    const warnBlock = (r.success && Array.isArray(r.warnings) && r.warnings.length)
+      ? '<div class="status-bar show warn" style="margin:0 0 12px 0;white-space:pre-line">' + r.warnings.map(w => '⚠ ' + escHtml(w)).join('\\n') + '</div>'
+      : '';
     item.innerHTML = \`
       <div class="result-item-header" onclick="toggleResult(this)">
         <div class="result-dot \${r.success ? 'ok' : 'err'}"></div>
         <div class="result-url">\${r.url}</div>
-        <span style="color:var(--mid-grey);font-size:12px">\${r.success ? '✓ Gegenereerd' : '✗ Mislukt'} — klik om te bekijken</span>
+        <span style="color:var(--mid-grey);font-size:12px">\${r.success ? (r.warnings && r.warnings.length ? '⚠ Gegenereerd met waarschuwing' : '✓ Gegenereerd') : '✗ Mislukt'} — klik om te bekijken</span>
       </div>
-      <div class="result-body" data-raw="\${escHtml(rawMd)}">\${bodyContent}</div>\`;
+      <div class="result-body" data-raw="\${escHtml(rawMd)}">\${warnBlock}\${bodyContent}</div>\`;
     // Kopieer-knop en raw-toggle per resultaat
     if (r.success) {
       const header = item.querySelector('.result-item-header');
