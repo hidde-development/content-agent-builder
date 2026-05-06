@@ -4611,16 +4611,50 @@ function lcGenApiAgent(reviewEnabled = false) {
     '    let revised = false;',
     '    let reviseWarning = null;',
     '',
-    '    // 4. Auto-revise bij oranje (max 1x) — alleen als review succesvol was',
-    '    if (review && review.verdict === "orange" && review.revisionPrompt) {',
+    '    // 4. Auto-revise bij oranje OF rood (max 1x) — laat de schrijver',
+    '    //    elk feedbackpunt verwerken, ook bij rood. De gebruiker krijgt dan',
+    '    //    de best mogelijke versie, met expliciete markering welke punten',
+    '    //    wel/niet verwerkt konden worden in plaats van een ruwe to-do-list.',
+    '    const shouldRevise = review && (review.verdict === "orange" || review.verdict === "red");',
+    '    if (shouldRevise) {',
     '      try {',
-    '        const revisedBrief = enrichedBrief + "\\n\\nREVISIE-INSTRUCTIE: " + review.revisionPrompt + "\\n\\nBESTAANDE OUTPUT:\\n" + contentV1;',
+    '        // Verzamel alle blocker + revise flags per critic — mapping wat verwerkt moet worden.',
+    '        const allFlags = [];',
+    '        Object.entries(review.reports || {}).forEach(([role, rep]) => {',
+    '          (rep.flags || []).forEach(f => {',
+    '            if (f.severity === "blocker" || f.severity === "revise") {',
+    '              allFlags.push({ role, severity: f.severity, issue: f.issue, suggestion: f.suggestion || "" });',
+    '            }',
+    '          });',
+    '        });',
+    '        const flagsList = allFlags.map((f, i) =>',
+    '          (i + 1) + ". [" + f.role.toUpperCase() + " · " + f.severity + "] " + f.issue + (f.suggestion ? "\\n   Suggestie: " + f.suggestion : "")',
+    '        ).join("\\n");',
+    '        const revInstructions = review.revisionPrompt',
+    '          ? review.revisionPrompt + "\\n\\nDETAILS PER PUNT:\\n" + flagsList',
+    '          : flagsList || "Verwerk alle aandachtspunten uit de critic-rapporten.";',
+    '        const revisedBrief = enrichedBrief',
+    '          + "\\n\\nREVISIE-INSTRUCTIE — verwerk ELK onderstaand feedbackpunt in de tekst:"',
+    '          + "\\n\\n" + revInstructions',
+    '          + "\\n\\nALS een punt om strikt feitelijke redenen niet kan worden verwerkt (bv. ontbrekende bron-info, juridische voorbehoud-claim die feitelijk klopt): noem dat NIET in de tekst zelf — produceer gewoon een schone webpagina."',
+    '          + "\\n\\nBESTAANDE OUTPUT:\\n" + contentV1;',
     '        const pageV2 = await callWritePage({ brief: revisedBrief, pageType, url, keywords: safeKeywords, templateCode, style });',
     '        finalPage = pageV2;',
     '        finalContent = pageV2.content || "";',
     '        revised = true;',
     '      } catch (reviseErr) {',
-    '        reviseWarning = "Automatische revisie na oranje verdict mislukt — eerste versie geleverd: " + reviseErr.message;',
+    '        reviseWarning = "Automatische revisie mislukt — eerste versie geleverd: " + reviseErr.message;',
+    '      }',
+    '    }',
+    '',
+    '    // 5. Re-review na revisie — laat de critics V2 opnieuw beoordelen zodat de',
+    '    //    UI checklist toont WAT er is verwerkt en WAT er nog open staat.',
+    '    let postReview = null;',
+    '    if (revised) {',
+    '      try {',
+    '        postReview = await runReview({ content: finalContent, brief: { url, pageType, keywords: safeKeywords, brief: safeBrief, style } });',
+    '      } catch (postErr) {',
+    '        // Niet kritisch — V1-review blijft beschikbaar voor de UI.',
     '      }',
     '    }',
     '',
@@ -4631,11 +4665,15 @@ function lcGenApiAgent(reviewEnabled = false) {
     '    if (reviewWarning)        warnings.push(reviewWarning);',
     '    if (reviseWarning)        warnings.push(reviseWarning);',
     '',
+    '    // Effective verdict = de review die hoort bij de finale tekst (V2 indien herzien, anders V1).',
+    '    const effective = postReview || review;',
+    '',
     '    return res.status(200).json({',
     '      success: true,',
     '      content: finalContent,',
     '      page: finalPage,',
-    '      ...(review ? { verdict: review.verdict, reports: review.reports, summary: review.summary, revised } : {}),',
+    '      ...(effective ? { verdict: effective.verdict, reports: effective.reports, summary: effective.summary, revised } : {}),',
+    '      ...(review && postReview ? { initialReports: review.reports, initialVerdict: review.verdict } : {}),',
     '      style,',
     '      ...(warnings.length ? { warnings } : {}),',
     '      // Legacy compat — frontend kan beide lezen.',
@@ -5406,9 +5444,11 @@ function lcGenToolWritePage() {
     '        ? brand + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules + linkRules',
     '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules + linkRules;',
     '      const mdRules = "\\n\\nOPMAAK-REGELS voor het content-veld (verplicht):\\n- Gebruik altijd een lege regel vóór én na elk kopje (##, ###)\\n- Gebruik altijd een lege regel voor en na een lijst\\n- Gebruik altijd een lege regel tussen alinea\'s\\n- Twee alinea\'s nooit direct aan elkaar plakken\\n- Geen trailing whitespace op regels";',
+    "      // Topregels herhalen vlak voor de output-instructie — anders raken ze begraven in de lange system-content.",
+    "      const hardRules = '\\n\\nABSOLUTE TOPREGELS (overtreden = afkeur):\\n- GEEN em-dashes (— of –). Ook niet als ze \"natuurlijk lopen\". Gebruik komma, punt of herschrijf.\\n- GEEN onnodige hoofdletters mid-sentence (niet: \"de Dienst\", \"ons Product\").\\n- ELKE webpagina heeft meta_title (max 60 tekens, primair keyword vooraan) ÉN meta_description (140-160 tekens). Lever ze altijd mee.\\n- ELKE link in de tekst moet 1-op-1 voorkomen in de meegegeven kennisbestanden. Niets verzinnen.\\n- Verwerk de URL-briefing: link 1× naar parent en 1× naar elk direct kind (max 1 niveau diep).';",
     '      const userPrompt = isCaseType',
-    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"meta_title\":\"...(max 60 tekens, primair keyword vooraan)\",\"meta_description\":\"...(140-160 tekens, met CTA)\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
-    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...(max 60 tekens, primair keyword vooraan, geen punt aan eind)\",\"meta_description\":\"...(140-160 tekens, met CTA, geen marketingtaal)\",\"slug\":\"...(kleine letters, koppeltekens)\",\"content\":\"...(volledige Markdown-tekst)\"}';"  ,
+    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + mdRules + hardRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"meta_title\":\"...(max 60 tekens, primair keyword vooraan)\",\"meta_description\":\"...(140-160 tekens, met CTA)\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
+    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + mdRules + hardRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...(max 60 tekens, primair keyword vooraan, geen punt aan eind)\",\"meta_description\":\"...(140-160 tekens, met CTA, geen marketingtaal)\",\"slug\":\"...(kleine letters, koppeltekens)\",\"content\":\"...(volledige Markdown-tekst)\"}';"  ,
     '      const response = await model.invoke([',
     "        { role: 'system', content: systemContent },",
     "        { role: 'user',   content: userPrompt }",
@@ -5416,6 +5456,12 @@ function lcGenToolWritePage() {
     "      const raw = typeof response.content === 'string' ? response.content : (response.content[0]?.text || '');",
     '      const match = raw.match(/{[\\s\\S]*}/);',
     "      const page = match ? (() => { try { return JSON.parse(match[0]); } catch { return { content: raw }; } })() : { content: raw };",
+    '',
+    "      // Programmatisch nettoetsen — safety net voor regels die de LLM soms toch overtreedt.",
+    "      // Em-dashes (— en –) → komma (de Nederlandse standaard-vervanging in lopende tekst).",
+    "      const cleanStr = s => typeof s === 'string' ? s.replace(/[—–]/g, ',').replace(/,\\s*,/g, ',').replace(/  +/g, ' ') : s;",
+    "      ['content', 'meta_title', 'meta_description', 'title'].forEach(k => { if (page[k]) page[k] = cleanStr(page[k]); });",
+    '',
     "      return JSON.stringify({ success: true, page: { ...page, ai_generated: true, generated_at: new Date().toISOString(), template_used: templateCode || null } });",
     '    } catch (err) {',
     '      return JSON.stringify({ success: false, error: err.message });',
@@ -7377,9 +7423,24 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   const ROLE_LABELS = { seo: 'SEO / GEO', brand: 'Brand', strategy: 'Strategy', legal: 'Juridisch', medical: 'Medisch', financial: 'Financieel', claims: 'Claims' };
   const VERDICT_TEXT = {
     green:  { title: 'Klaar voor publicatie', hint: 'Alle critics akkoord — geen openstaande punten.' },
-    orange: { title: 'Tekst bijgewerkt', hint: 'De schrijfagent heeft de tekst al bijgewerkt op basis van de critic-feedback. Bekijk de aandachtspunten hieronder vóór publicatie.' },
-    red:    { title: 'Human review vereist', hint: 'Een critic vond een blocker die handmatige correctie vereist. Publiceren is geblokkeerd.' },
+    orange: { title: 'Tekst bijgewerkt — controleer aandachtspunten', hint: 'De schrijfagent heeft alle critic-feedback verwerkt. Onderstaande punten zijn bijgewerkt; controleer of het resultaat klopt.' },
+    red:    { title: 'Tekst bijgewerkt — handmatige check vereist', hint: 'De schrijfagent heeft een revisiepoging gedaan, maar enkele blockers konden niet automatisch worden weggenomen. Zie hieronder welke punten nog openstaan.' },
   };
+
+  // Vergelijk een V1-flag met de V2-flags-lijst om te bepalen of dit punt is verwerkt.
+  // Match heuristiek: zelfde issue-tekst (case-insensitive, fuzzy) → niet verwerkt.
+  // Geen match → succesvol verwerkt.
+  function isFlagResolved(v1Flag, v2Flags) {
+    if (!Array.isArray(v2Flags) || !v2Flags.length) return true;
+    const v1Issue = (v1Flag.issue || '').toLowerCase().trim();
+    if (!v1Issue) return true;
+    return !v2Flags.some(v2f => {
+      const v2Issue = (v2f.issue || '').toLowerCase().trim();
+      if (!v2Issue) return false;
+      // Substring-match in beide richtingen — dekt licht aangepaste herformuleringen.
+      return v1Issue.includes(v2Issue) || v2Issue.includes(v1Issue);
+    });
+  }
 
   function renderVerdict(data) {
     const wrap = document.getElementById('w-verdict-wrap');
@@ -7397,43 +7458,60 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     summary.textContent = data.summary || meta.hint;
     publishBtn.style.display = verdict === 'red' ? 'none' : '';
 
-    // Render reports als afvinklijst
+    // Render reports als afvinklijst — gebruik V1 (initialReports) als basis voor wat er
+    // ooit gemeld werd, en V2 (reports) om te bepalen wat is verwerkt vs nog open.
     const reportsEl = document.getElementById('w-reports');
     reportsEl.innerHTML = '';
-    const reports = data.reports || {};
+    const finalReports   = data.reports || {};
+    const initialReports = data.initialReports || null;
     const isRevised = !!data.revised;
+    // Bron voor de checklist: V1-flags geven 'wat is opgepakt'; bij niet-revised is V1 = V2.
+    const baseReports = initialReports || finalReports;
 
-    Object.keys(reports).forEach(role => {
-      const rep = reports[role] || {};
-      const flags = Array.isArray(rep.flags) ? rep.flags : [];
+    Object.keys(baseReports).forEach(role => {
+      const v1Rep = baseReports[role] || {};
+      const v2Rep = finalReports[role] || v1Rep;
+      const v1Flags = Array.isArray(v1Rep.flags) ? v1Rep.flags : [];
+      const v2Flags = Array.isArray(v2Rep.flags) ? v2Rep.flags : [];
       const item = document.createElement('div');
       item.className = 'report';
       const label = ROLE_LABELS[role] || role;
 
-      // Header-icoon: ✓ als alleen optionals (of geen), ⚠ bij revise/blocker
-      const hasOpenIssue = flags.some(f => f.severity === 'blocker' || f.severity === 'revise');
-      const headerIcon = hasOpenIssue ? '⚠️' : '✓';
-      const headerColor = hasOpenIssue ? '#E67E22' : '#27AE60';
-      const openCount = flags.filter(f => f.severity !== 'optional').length;
-      const optCount  = flags.filter(f => f.severity === 'optional').length;
-      const headerLabel = openCount
-        ? openCount + ' aandachtspunt' + (openCount > 1 ? 'en' : '') + (optCount ? ', ' + optCount + ' optioneel' : '')
-        : (optCount ? optCount + ' optioneel' : 'alles in orde');
+      // Tel hoeveel V1-blockers/revises in V2 zijn opgelost vs nog open
+      const openV1 = v1Flags.filter(f => f.severity === 'blocker' || f.severity === 'revise');
+      const stillOpenInV2 = openV1.filter(f => !isFlagResolved(f, v2Flags));
+      const resolvedCount = openV1.length - stillOpenInV2.length;
+      const optCount = v1Flags.filter(f => f.severity === 'optional').length;
 
-      // Body: optionele "al bijgewerkt"-melding + checkpunten
+      // Header-icoon
+      const headerIcon = stillOpenInV2.length ? '⚠️' : '✓';
+      const headerColor = stillOpenInV2.length ? '#E67E22' : '#27AE60';
+      const headerParts = [];
+      if (resolvedCount && isRevised) headerParts.push(resolvedCount + ' verwerkt');
+      if (stillOpenInV2.length) headerParts.push(stillOpenInV2.length + ' nog open');
+      if (optCount) headerParts.push(optCount + ' optioneel');
+      const headerLabel = headerParts.length ? headerParts.join(', ') : 'alles in orde';
+
+      // Body: V1-flags getoond met ✓/⚠ status (verwerkt vs nog open).
       let bodyHtml = '';
-      if (isRevised && flags.length) {
-        bodyHtml += '<div class="revised-note">✓ De schrijfagent heeft de tekst al bijgewerkt op basis van onderstaande punten. Controleer of het resultaat klopt.</div>';
+      if (isRevised && (resolvedCount || stillOpenInV2.length)) {
+        bodyHtml += '<div class="revised-note">De schrijfagent heeft een revisiepoging gedaan op alle onderstaande punten. ✓ = verwerkt in de tekst, ⚠ = nog steeds aandachtspunt na revisie.</div>';
       }
-      if (flags.length) {
-        bodyHtml += flags.map(f => {
+      if (v1Flags.length) {
+        bodyHtml += v1Flags.map(f => {
           const sev = f.severity || 'optional';
-          const icon = sev === 'optional' ? '💡' : '⚠️';
-          const label = sev === 'optional' ? 'Optioneel' : 'Aandachtspunt';
+          let icon, statusLabel, color;
+          if (sev === 'optional') {
+            icon = '💡'; statusLabel = 'Optioneel ter overweging'; color = '';
+          } else if (isRevised && isFlagResolved(f, v2Flags)) {
+            icon = '✓'; statusLabel = 'Verwerkt'; color = '#27AE60';
+          } else {
+            icon = '⚠️'; statusLabel = isRevised ? 'Nog open na revisie' : 'Aandachtspunt'; color = '#E67E22';
+          }
           return '<div class="check-item">' +
-            '<div class="check-icon">' + icon + '</div>' +
+            '<div class="check-icon" style="color:' + color + '">' + icon + '</div>' +
             '<div class="check-text">' +
-              '<strong>' + escHtml(label) + ' — ' + escHtml(f.issue || '') + '</strong>' +
+              '<strong>' + escHtml(statusLabel) + ' — ' + escHtml(f.issue || '') + '</strong>' +
               (f.suggestion ? '<span>' + escHtml(f.suggestion) + '</span>' : '') +
             '</div>' +
           '</div>';
