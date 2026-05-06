@@ -5391,13 +5391,24 @@ function lcGenToolWritePage() {
     "      const briefingBlock = urlBriefing ? '\\n\\n---\\n\\n## URL-briefing (uit SEO-strategie)\\n\\n' + urlBriefing : '';",
     '',
     '      const langRules = "\\n\\n---\\n\\n## TAALREGELS (altijd verplicht — ook bij revisies)\\n\\n- Schrijf correct Nederlands (NLP). Geen Engelse constructies in Nederlandse zinnen.\\n- VERBODEN: em-dashes (— en –). Vervang altijd door een komma, een punt of herschrijf de zin.\\n- Geen onnodige hoofdletters mid-sentence. Niet: \'de Dienst\', \'ons Product\', \'uw Organisatie\'.\\n- Houd de aanspreekvorm (je of u) consistent door de gehele tekst.\\n- Geen AI-clichés: geen \'in de wereld van\', \'in dit artikel\', \'kom meer te weten\', \'navigeer naar\'.";',
+    "      // Harde linkregels — voorkomt zelf-verwijzing, URL-hallucinatie en onjuiste cluster-diepte.",
+    "      const linkRules = '\\n\\n---\\n\\n## LINKREGELS (verplicht — geldt voor élke <a>-link in het content-veld)\\n\\n'",
+    "        + '1. ZELF-VERWIJZING VERBODEN. Link nooit naar de URL waarvoor je deze pagina schrijft (' + (url || '(geen URL meegegeven)') + ').\\n'",
+    "        + '2. URL-HALLUCINATIE VERBODEN. Een URL mag ALLEEN gelinkt worden als die LETTERLIJK voorkomt in:\\n'",
+    "        + '   - de URL-briefing (parent / kinderen / consolidatiebronnen)\\n'",
+    "        + '   - de productcatalogus in knowledge.md\\n'",
+    "        + '   - de hoofdpagina-lijst in seo.md\\n'",
+    "        + '   Komt een URL niet 1-op-1 voor in deze bronnen? NIET LINKEN. Geen vergelijkbare paden raden, geen URL-fragmenten verzinnen, geen domeinnamen invullen op gevoel.\\n'",
+    "        + '3. KINDEREN VERPLICHT (max 1 niveau diep). Als de URL-briefing een lijst kinderen bevat, link in de lopende tekst minstens één keer naar elk direct kind. Niet dieper: een level-1 pagina linkt alleen naar level-2 kinderen, niet naar level-3.\\n'",
+    "        + '4. PARENT VERPLICHT. Link minstens één keer naar de parent uit de URL-briefing (mits aanwezig en niet de homepage).\\n'",
+    "        + '5. ANKERTEKST. Beschrijvend en natuurlijk — geen \\\"hier\\\", \\\"klik hier\\\" of kale URL.';",
     '      const systemContent = isCaseType',
-    '        ? brand + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules',
-    '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules;',
+    '        ? brand + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules + linkRules',
+    '        : brand + "\\n\\n---\\n\\n" + seo + "\\n\\n---\\n\\n" + tplBlock + "\\n\\n---\\n\\n" + knowledge + briefingBlock + langRules + linkRules;',
     '      const mdRules = "\\n\\nOPMAAK-REGELS voor het content-veld (verplicht):\\n- Gebruik altijd een lege regel vóór én na elk kopje (##, ###)\\n- Gebruik altijd een lege regel voor en na een lijst\\n- Gebruik altijd een lege regel tussen alinea\'s\\n- Twee alinea\'s nooit direct aan elkaar plakken\\n- Geen trailing whitespace op regels";',
     '      const userPrompt = isCaseType',
-    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
-    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...\",\"meta_description\":\"...\",\"slug\":\"...\",\"content\":\"...(volledige Markdown-tekst)\"}';"  ,
+    "        ? 'Schrijf ' + (pageType === 'case' ? 'een casepagina' : 'een social proof snippet') + ' volgens het case/social proof schrijfregime in templates.md.\\nSEO-regels zijn NIET van toepassing.\\nURL (indien van toepassing): ' + url + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown, geen uitleg):\\n{\"title\":\"...\",\"meta_title\":\"...(max 60 tekens, primair keyword vooraan)\",\"meta_description\":\"...(140-160 tekens, met CTA)\",\"content\":\"...(volledige Markdown-tekst)\"}' ",
+    "        : 'Schrijf een complete webpagina.\\nURL: ' + url + '\\nPaginatype: ' + pageType + (templateCode ? '\\nKlantspecifieke template: ' + templateCode + ' — volg de sectie-volgorde uit de KLANTSPECIFIEKE TEMPLATE bovenaan.' : '') + '\\nZoekwoorden: ' + keywords + '\\n\\nOpdracht:\\n' + brief + mdRules + '\\n\\nGeef ALLEEN dit JSON-object terug (geen markdown code blocks, geen uitleg):\\n{\"meta_title\":\"...(max 60 tekens, primair keyword vooraan, geen punt aan eind)\",\"meta_description\":\"...(140-160 tekens, met CTA, geen marketingtaal)\",\"slug\":\"...(kleine letters, koppeltekens)\",\"content\":\"...(volledige Markdown-tekst)\"}';"  ,
     '      const response = await model.invoke([',
     "        { role: 'system', content: systemContent },",
     "        { role: 'user',   content: userPrompt }",
@@ -6882,9 +6893,46 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         </div>
         <div class="reports-wrap" id="w-reports"></div>
       </div>
+      <div class="output-box" id="w-meta-output" style="display:none;margin-bottom:12px">
+        <div class="output-header">
+          <span class="output-label">Meta-velden</span>
+          <button class="btn-secondary" onclick="copyAllMeta()" title="Kopieer alle meta-velden als TSV (handig voor bulk-import in CMS)">Kopieer alle</button>
+        </div>
+        <div class="meta-grid" style="padding:14px 18px;display:grid;grid-template-columns:1fr;gap:12px">
+          <div class="meta-row" id="w-meta-title-row" style="display:none">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+              <label style="font-size:11px;font-weight:600;color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em">Meta title</label>
+              <span style="font-size:11px;color:var(--mid-grey)"><span id="w-meta-title-len">0</span>/60</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="w-meta-title" readonly style="flex:1;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--light-grey);border-radius:6px;background:var(--off-white);color:var(--near-black)" />
+              <button class="btn-secondary" onclick="copyMetaField('w-meta-title')" style="padding:8px 12px">Kopieer</button>
+            </div>
+          </div>
+          <div class="meta-row" id="w-meta-desc-row" style="display:none">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+              <label style="font-size:11px;font-weight:600;color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em">Meta description</label>
+              <span style="font-size:11px;color:var(--mid-grey)"><span id="w-meta-desc-len">0</span>/155</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <textarea id="w-meta-desc" readonly rows="2" style="flex:1;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--light-grey);border-radius:6px;background:var(--off-white);color:var(--near-black);resize:vertical"></textarea>
+              <button class="btn-secondary" onclick="copyMetaField('w-meta-desc')" style="padding:8px 12px">Kopieer</button>
+            </div>
+          </div>
+          <div class="meta-row" id="w-meta-slug-row" style="display:none">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+              <label style="font-size:11px;font-weight:600;color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em">Slug</label>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="w-meta-slug" readonly style="flex:1;font-family:monospace;font-size:13px;padding:8px 10px;border:1px solid var(--light-grey);border-radius:6px;background:var(--off-white);color:var(--near-black)" />
+              <button class="btn-secondary" onclick="copyMetaField('w-meta-slug')" style="padding:8px 12px">Kopieer</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="output-box" id="w-output">
         <div class="output-header">
-          <span class="output-label">Gegenereerde pagina</span>
+          <span class="output-label">Pagina-content</span>
           <div style="display:flex;gap:8px">
             <button class="btn-secondary" id="w-raw-btn" onclick="toggleRawContent()" title="Schakel tussen rendered preview en raw markdown">Raw</button>
             <button class="btn-secondary" onclick="copyOutput('w-content')">Kopieer markdown</button>
@@ -6990,6 +7038,47 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
   function copyOutput(id) {
     const el = document.getElementById(id);
     navigator.clipboard.writeText(el.dataset.raw || el.textContent || '');
+  }
+
+  // Vult de meta-velden (title/description/slug) wanneer de agent ze meegestuurd heeft.
+  // Lege velden worden verborgen, lengtes worden geteld voor SEO-feedback.
+  function renderMetaFields(page) {
+    const wrap = document.getElementById('w-meta-output');
+    const mt = page.meta_title || page.title || '';
+    const md = page.meta_description || '';
+    const sl = page.slug || '';
+    const titleRow = document.getElementById('w-meta-title-row');
+    const descRow  = document.getElementById('w-meta-desc-row');
+    const slugRow  = document.getElementById('w-meta-slug-row');
+    if (mt) {
+      document.getElementById('w-meta-title').value = mt;
+      document.getElementById('w-meta-title-len').textContent = mt.length;
+      titleRow.style.display = '';
+    } else { titleRow.style.display = 'none'; }
+    if (md) {
+      document.getElementById('w-meta-desc').value = md;
+      document.getElementById('w-meta-desc-len').textContent = md.length;
+      descRow.style.display = '';
+    } else { descRow.style.display = 'none'; }
+    if (sl) {
+      document.getElementById('w-meta-slug').value = sl;
+      slugRow.style.display = '';
+    } else { slugRow.style.display = 'none'; }
+    wrap.style.display = (mt || md || sl) ? '' : 'none';
+  }
+
+  function copyMetaField(id) {
+    const el = document.getElementById(id);
+    navigator.clipboard.writeText(el.value || '');
+  }
+
+  // TSV-formaat: makkelijk te plakken in Excel-kolommen voor bulk-import in CMS.
+  function copyAllMeta() {
+    const mt = document.getElementById('w-meta-title').value || '';
+    const md = document.getElementById('w-meta-desc').value || '';
+    const sl = document.getElementById('w-meta-slug').value || '';
+    const tsv = 'meta_title\\tmeta_description\\tslug\\n' + mt + '\\t' + md + '\\t' + sl;
+    navigator.clipboard.writeText(tsv);
   }
 
   // Minimale markdown → HTML renderer (geen externe afhankelijkheid)
@@ -7222,6 +7311,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     setStatus('w-status', 'Agent schrijft — en review-pipeline (3 critics + synthesizer) loopt na afloop. Tel op ~60–120 seconden.', 'info');
     hideStatus('w-source-warn');
     document.getElementById('w-output').classList.remove('show');
+    document.getElementById('w-meta-output').style.display = 'none';
     document.getElementById('w-verdict-wrap').style.display = 'none';
     lastPage = null;
     lastVerdict = null;
@@ -7247,6 +7337,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       const _rawBtn = document.getElementById('w-raw-btn');
       if (_rawBtn) _rawBtn.textContent = 'Raw';
       document.getElementById('w-output').classList.add('show');
+      renderMetaFields(data.page || {});
       lastPage = data.page || { content: data.content };
       lastVerdict = data.verdict || null;
       if (data.verdict) {
@@ -7483,22 +7574,50 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     const warnBlock = (r.success && Array.isArray(r.warnings) && r.warnings.length)
       ? '<div class="status-bar show warn" style="margin:0 0 12px 0;white-space:pre-line">' + r.warnings.map(w => '⚠ ' + escHtml(w)).join('\\n') + '</div>'
       : '';
+    // Meta-velden (title/description/slug) — inline boven de content voor snelle controle.
+    const p = (r.page || {});
+    const mt = p.meta_title || p.title || '';
+    const md = p.meta_description || '';
+    const sl = p.slug || '';
+    const metaBlock = (r.success && (mt || md || sl))
+      ? '<div style="background:var(--off-white);border:1px solid var(--light-grey);border-radius:6px;padding:10px 14px;margin:0 0 12px 0;font-size:12px;line-height:1.6">'
+        + (mt ? '<div><strong style="color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em;font-size:10px">Meta title</strong> <span style="color:var(--mid-grey);font-size:10px">(' + mt.length + '/60)</span><br>' + escHtml(mt) + '</div>' : '')
+        + (md ? '<div style="margin-top:6px"><strong style="color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em;font-size:10px">Meta description</strong> <span style="color:var(--mid-grey);font-size:10px">(' + md.length + '/155)</span><br>' + escHtml(md) + '</div>' : '')
+        + (sl ? '<div style="margin-top:6px"><strong style="color:var(--mid-grey);text-transform:uppercase;letter-spacing:0.06em;font-size:10px">Slug</strong><br><code>' + escHtml(sl) + '</code></div>' : '')
+        + '</div>'
+      : '';
     item.innerHTML = \`
       <div class="result-item-header" onclick="toggleResult(this)">
         <div class="result-dot \${r.success ? 'ok' : 'err'}"></div>
         <div class="result-url">\${r.url}</div>
         <span style="color:var(--mid-grey);font-size:12px">\${r.success ? (r.warnings && r.warnings.length ? '⚠ Gegenereerd met waarschuwing' : '✓ Gegenereerd') : '✗ Mislukt'} — klik om te bekijken</span>
       </div>
-      <div class="result-body" data-raw="\${escHtml(rawMd)}">\${warnBlock}\${bodyContent}</div>\`;
-    // Kopieer-knop en raw-toggle per resultaat
+      <div class="result-body" data-raw="\${escHtml(rawMd)}">\${warnBlock}\${metaBlock}\${bodyContent}</div>\`;
+    // Kopieer-knop: standaard markdown, met TSV-fallback voor bulk-import in CMS.
     if (r.success) {
       const header = item.querySelector('.result-item-header');
       const copyBtn = document.createElement('button');
       copyBtn.className = 'btn-secondary';
       copyBtn.style.cssText = 'padding:3px 10px;font-size:11px;margin-left:auto;flex-shrink:0';
-      copyBtn.textContent = 'Kopieer';
-      copyBtn.onclick = e => { e.stopPropagation(); navigator.clipboard.writeText(rawMd); copyBtn.textContent = '✓'; setTimeout(() => copyBtn.textContent = 'Kopieer', 1500); };
+      copyBtn.textContent = 'Kopieer MD';
+      copyBtn.title = 'Markdown van deze pagina kopiëren';
+      copyBtn.onclick = e => { e.stopPropagation(); navigator.clipboard.writeText(rawMd); copyBtn.textContent = '✓'; setTimeout(() => copyBtn.textContent = 'Kopieer MD', 1500); };
       header.appendChild(copyBtn);
+      if (mt || md || sl) {
+        const tsvBtn = document.createElement('button');
+        tsvBtn.className = 'btn-secondary';
+        tsvBtn.style.cssText = 'padding:3px 10px;font-size:11px;flex-shrink:0';
+        tsvBtn.textContent = 'Kopieer TSV';
+        tsvBtn.title = 'URL + meta-velden + content als TSV-rij — direct te plakken in Excel voor bulk-import';
+        tsvBtn.onclick = e => {
+          e.stopPropagation();
+          const tsv = [r.url, mt, md, sl, rawMd.replace(/\\t/g, ' ').replace(/\\n/g, '\\\\n')].join('\\t');
+          navigator.clipboard.writeText(tsv);
+          tsvBtn.textContent = '✓';
+          setTimeout(() => tsvBtn.textContent = 'Kopieer TSV', 1500);
+        };
+        header.appendChild(tsvBtn);
+      }
     }
     list.appendChild(item);
   }
