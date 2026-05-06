@@ -7125,7 +7125,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
           <span class="output-label">Pagina-content</span>
           <div style="display:flex;gap:8px">
             <button class="btn-secondary" id="w-raw-btn" onclick="toggleRawContent()" title="Schakel tussen rendered preview en raw markdown">Raw</button>
-            <button class="btn-secondary" onclick="copyOutput('w-content')">Kopieer markdown</button>
+            <button class="btn-secondary" onclick="copyOutput('w-content')" title="Plakken in CMS rich-text editor → echte hyperlinks. Plakken in markdown-editor → markdown-source als fallback.">Kopieer</button>
           </div>
         </div>
         <div class="output-content" id="w-content"></div>
@@ -7225,9 +7225,30 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
     if (el) el.className = 'status-bar';
   }
 
+  // Dual-format clipboard: text/html (voor CMS WYSIWYG) + text/plain markdown
+  // (voor markdown-editors). De ontvangende app kiest het juiste formaat.
+  // Effect: plakken in Webflow/WordPress/Contentful → echte hyperlinks.
+  // Plakken in Obsidian/Notion/markdown-files → markdown-source behouden.
+  async function copyRichOrMd(md) {
+    if (!md) return;
+    try {
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+        const html = renderMd(md);
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html':  new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([md],   { type: 'text/plain' }),
+          })
+        ]);
+        return;
+      }
+    } catch (_) { /* fallback below */ }
+    await navigator.clipboard.writeText(md);
+  }
+
   function copyOutput(id) {
     const el = document.getElementById(id);
-    navigator.clipboard.writeText(el.dataset.raw || el.textContent || '');
+    copyRichOrMd(el.dataset.raw || el.textContent || '');
   }
 
   // Vult de meta-velden (title/description/slug) wanneer de agent ze meegestuurd heeft.
@@ -7821,9 +7842,9 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
       const copyBtn = document.createElement('button');
       copyBtn.className = 'btn-secondary';
       copyBtn.style.cssText = 'padding:3px 10px;font-size:11px;margin-left:auto;flex-shrink:0';
-      copyBtn.textContent = 'Kopieer MD';
-      copyBtn.title = 'Markdown van deze pagina kopiëren';
-      copyBtn.onclick = e => { e.stopPropagation(); navigator.clipboard.writeText(rawMd); copyBtn.textContent = '✓'; setTimeout(() => copyBtn.textContent = 'Kopieer MD', 1500); };
+      copyBtn.textContent = 'Kopieer';
+      copyBtn.title = 'Kopieer als rich text (echte hyperlinks in CMS) + markdown-fallback';
+      copyBtn.onclick = e => { e.stopPropagation(); copyRichOrMd(rawMd); copyBtn.textContent = '✓'; setTimeout(() => copyBtn.textContent = 'Kopieer', 1500); };
       header.appendChild(copyBtn);
       if (mt || md || sl) {
         const tsvBtn = document.createElement('button');
