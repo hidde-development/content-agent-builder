@@ -3111,6 +3111,26 @@ function generateBrandMd() {
   ].filter(Boolean).join('\n');
   const toonSection = `\n## Tone of voice\n\n${toonLines}\n`;
 
+  // Schrijfregels: leesniveau / zinsstructuur / doelmarkt / max-lengtes.
+  // Komen anders nergens terecht voor de LangChain-deployment (system-prompt.md wordt
+  // alleen door de Custom GPT-route gelezen). Pure doorgifte van wat in het formulier staat —
+  // geen voorgekauwde uitleg of vakwoord-vervangingen, want dit is een white-label tool.
+  const leesniveau    = btnGroupValues['LEESNIVEAU'];
+  const zinsstructuur = btnGroupValues['ZINSSTRUCTUUR'];
+  const doelmarkt     = btnGroupValues['DOELMARKT'];
+  const maxWZin       = val('MAX_WOORDEN_PER_ZIN');
+  const maxWAlinea    = val('MAX_WOORDEN_PER_ALINEA');
+  const schrijfregelsLines = [
+    leesniveau    ? `- Leesniveau: ${leesniveau} (Europees referentiekader — consequent toepassen op woordkeuze, zinslengte en uitleg van vakbegrippen)` : '',
+    zinsstructuur ? `- Zinsstructuur: ${zinsstructuur}` : '',
+    doelmarkt     ? `- Doelmarkt: ${doelmarkt}` : '',
+    maxWZin       ? `- Max. ${maxWZin} woorden per zin` : '',
+    maxWAlinea    ? `- Max. ${maxWAlinea} woorden per alinea` : '',
+  ].filter(Boolean).join('\n');
+  const schrijfregelsSection = schrijfregelsLines
+    ? `\n## Schrijfregels\n\nGelden voor élke pagina, élk paginatype. Brand.md is leidend; bij conflict met andere bronnen wint dit blok.\n\n${schrijfregelsLines}\n`
+    : '';
+
   const merkwaardenLijst = val('MERKWAARDEN_LIJST');
   const merkwaardenSection = merkwaardenLijst
     ? `\n## Merkwaarden\n\n${merkwaardenLijst}\n\nImpliciet verwerken. Nooit letterlijk noemen.\n`
@@ -3158,7 +3178,7 @@ function generateBrandMd() {
     : '';
 
   return `# ${client} — Merkprofiel
-${aanspreekvormSection}${toonSection}${merkwaardenSection}${pijlersSection}${sec('Kernuitkomsten', chipsToMd('uitkomsten'))}${sec('Redactionele invalshoek', chipsToMd('strategie'))}${merktermenSection}${doelgroepSection}${verbodenSection}${stijlSection}`;
+${aanspreekvormSection}${toonSection}${schrijfregelsSection}${merkwaardenSection}${pijlersSection}${sec('Kernuitkomsten', chipsToMd('uitkomsten'))}${sec('Redactionele invalshoek', chipsToMd('strategie'))}${merktermenSection}${doelgroepSection}${verbodenSection}${stijlSection}`;
 }
 
 // ── seo.md ────────────────────────────────────────────────────────────────
