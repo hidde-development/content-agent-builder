@@ -7710,7 +7710,7 @@ function lcGenFrontend(cfg, cms, migConfig = {}, reviewConfig = {}) {
         '<div class="report-header" onclick="toggleReport(this)">' +
           '<span style="font-size:14px;color:' + headerColor + ';flex-shrink:0;line-height:1">' + headerIcon + '</span>' +
           '<span class="report-role-tag">' + escHtml(label) + '</span>' +
-          '<span class="report-role"><span class="report-summary">' + escHtml(rep.summary || '') + '</span></span>' +
+          '<span class="report-role"><span class="report-summary">' + escHtml(v2Rep.summary || v1Rep.summary || '') + '</span></span>' +
           '<span style="color:var(--mid-grey);font-size:12px;white-space:nowrap">' + escHtml(headerLabel) + '</span>' +
         '</div>' +
         '<div class="report-body">' + bodyHtml + '</div>';
